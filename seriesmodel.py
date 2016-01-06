@@ -7,24 +7,46 @@ from sklearn.linear_model import LogisticRegression as LR
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from itertools import izip
+from Collections import defaultdict
 
 class SeriesModel(object):
-    def __init__(self, model=LR, preprocessor=PCA):
-        self.X = None
-        self.y = None
-        self.trial_lengths = None
+    def __init__(self, X=None, y=None,
+            color_scale = 'RGB', color_vectors_type = 'DI',
+            reference_time = 0,
+            detection_model=LR, detection_preprocessor=PCA,
+            gram_model=LR, gram_preprocessor=PCA,
+            classification_model=LR, classification_preprocessor=PCA):
+        self.X = X
+        self.y = y
         self.predictions = None
         self.scores = None
-        self.model = model
-        self.preprocessor = preprocessor
+
+        self.color_scale = color_scale
+        self.color_vector_type = color_vector_type
+        self.reference_time = reference_time
+
         self.verbose = False
+        self.trial_lengths = None
         self.number_of_columns = 220 # expected number of spots and colors
+
+        # self.models is a group of models for detection, gram, classification
+        # at each timepoint
+        self.models = defaultdict(list)
+
+        # set base models and preprocessors
+        self.detection_base_model = detection_model
+        self.detection_base_preprocessor = detection_preprocessor
+        self.gram_base_model = gram_model
+        self.gram_base_preprocessor = gram_preprocessor
+        self.classification_base_model = classification_model
+        self.classification_base_preprocessor = classification_preprocessor
+
 
     def __repr__(self):
         pass
 
-    def fit(self, X, y, verbose=False):
-        self.X = X
+    def fit(self, X, y, verbose=False, reference_time=self.reference_time):
+        self.X = self.preprocess(X, reference_time=reference_time)
         self.y = y
         self.verbose = verbose
 
@@ -36,6 +58,34 @@ class SeriesModel(object):
         while t < self.trial_lengths.max():
             self._fit_one_timestep(t)
             t += 1
+
+    def preprocess(self, X, reference_time=0):
+        # change color-scale as required
+        # assume it's RGB
+        if self.color_scale == 'CSV':
+            X = self._rgb_to_csv(X)
+
+        if self.color_vector_type == 'I':
+            pass
+        elif self.color_vector_type == 'DI':
+            X = self._calculate_differences(X, reference_time)
+        elif self.color_vector_type == 'DII':
+            X = self._calculate_normalized_differences(X, reference_time)
+
+        return X
+
+    def _calculate_normalized_differences(self, X, reference_time):
+        return X
+
+    def _calculate_differences(self, X, reference_time):
+        X['data'] = X['data'].apply(lambda x: )
+        z_sub = Z.copy()
+        z_sub['data'] = z_sub['data'].apply(lambda x: x.iloc[0:number_of_times].values)
+        return z_sub.values
+
+    def _rgb_to_csv(self, X):
+        return X
+
 
 
     def _fit_one_timestep(self, number_of_times):
@@ -70,8 +120,10 @@ class SeriesModel(object):
 
         self.add_scores(y_predict, number_of_times)
 
-    def _subset_data(self, X, number_of_times):
-        pass
+    def _subset_data(self, Z, number_of_times):
+        z_sub = Z.copy()
+        z_sub['data'] = z_sub['data'].apply(lambda x: x.iloc[0:number_of_times].values)
+        return z_sub.values
 
     def _featurize_detection(self, X_train):
         pass

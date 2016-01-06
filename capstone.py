@@ -11,6 +11,7 @@ import re
 import datetime
 from sklearn.cross_validation import train_test_split, StratifiedShuffleSplit
 import time
+import rpy2
 
 def timestamp_interpretter(x):
     # TODO - fix regex for timestamps of the type:
@@ -157,3 +158,9 @@ if __name__ == '__main__':
 
     # NOTE: can get back all of the data via df.ix[] whatever the index is
     # in y_train, y_test, etc.
+
+    # construct loop structure we would use
+    times = [6*3, 8*3, 12*3, 15*3] # start looking at after 6, 8, 12 and 15 hrs
+    for t in times:
+        # feed data into featurizer
+        pass
