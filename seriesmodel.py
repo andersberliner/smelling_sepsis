@@ -7,11 +7,11 @@ from sklearn.linear_model import LogisticRegression as LR
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from itertools import izip
-from Collections import defaultdict
+from collections import defaultdict
 
 class SeriesModel(object):
     def __init__(self, X=None, y=None,
-            color_scale = 'RGB', color_vectors_type = 'DI',
+            color_scale = 'RGB', color_vector_type = 'DI',
             reference_time = 0,
             detection_model=LR, detection_preprocessor=PCA,
             gram_model=LR, gram_preprocessor=PCA,
@@ -45,8 +45,8 @@ class SeriesModel(object):
     def __repr__(self):
         pass
 
-    def fit(self, X, y, verbose=False, reference_time=self.reference_time):
-        self.X = self.preprocess(X, reference_time=reference_time)
+    def fit(self, X, y, verbose=False, reference_time=0):
+        self.X = self.preprocess(X.copy(), reference_time=reference_time)
         self.y = y
         self.verbose = verbose
 
@@ -68,20 +68,31 @@ class SeriesModel(object):
         if self.color_vector_type == 'I':
             pass
         elif self.color_vector_type == 'DI':
-            X = self._calculate_differences(X, reference_time)
+            X = X.apply(lambda x: self._calculate_differences(x, reference_time))
         elif self.color_vector_type == 'DII':
-            X = self._calculate_normalized_differences(X, reference_time)
+            X = X.apply(lambda x: self._calculate_normalized_differences(x, reference_time))
 
         return X
 
-    def _calculate_normalized_differences(self, X, reference_time):
-        return X
+    def _calculate_normalized_differences(self, x, reference_time):
+        z = np.copy(x.astype(float))
+        # DI(0<=reference_time) = 0
+        # DI(t>reference_time) = (I(t) - I(reference_time))(I(reference_time))*100
+        z[reference_time:, 1:] = (z[reference_time:, 1:] \
+                                - z[reference_time, 1:]) \
+                                / z.astype(float)[reference_time, 1:] \
+                                * 100.0
+        z[:reference_time, 1:] = 0
+        return z
 
-    def _calculate_differences(self, X, reference_time):
-        X['data'] = X['data'].apply(lambda x: )
-        z_sub = Z.copy()
-        z_sub['data'] = z_sub['data'].apply(lambda x: x.iloc[0:number_of_times].values)
-        return z_sub.values
+    def _calculate_differences(self, x, reference_time):
+        z = np.copy(x)
+        # DI(0<=reference_time) = 0
+        # DI(t>reference_time) = I(t) - I(reference_time)
+        z[reference_time:, 1:] = z[reference_time:, 1:] - \
+                                    z[reference_time, 1:]
+        z[:reference_time, 1:] = 0
+        return z
 
     def _rgb_to_csv(self, X):
         return X
@@ -149,19 +160,19 @@ class SeriesModel(object):
     def find_trial_lengths(self, X):
         trial_lengths = np.zeros(len(X))
         for i, trial in enumerate(X):
-            trial_lengths[i] = len(trial['data'])
+            trial_lengths[i] = len(trial)
         return trial_lengths
 
     def inspect_trial_shapes(self, X):
         trial_widths = np.zeros(len(X))
         for i, trial in enumerate(X):
-            trial_widths[i] = shape(trial['data'])[1]
+            trial_widths[i] = trial.shape[1]
 
         trial_indexes = X.index.values
         trials_to_inspect = trial_indexes[trial_widths != self.number_of_columns]
-        trial_widths_to_inspect = trial_widths[trial_widhts != self.number_of_columns]
+        trial_widths_to_inspect = trial_widths[trial_widths != self.number_of_columns]
         for index, width in izip(trials_to_inspect, trial_widths_to_inspect):
             print '**ERROR: Check trial %d - has %d columns' % (index, width)
 
 if __name__ == '__main__':
-    pass
+    print 'Series Model imported'

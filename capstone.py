@@ -114,25 +114,41 @@ def split_train_test(X, y):
 
     return X_train, X_test, y_train, y_test
 
+def prepare_data_frame(df_raw):
+    df = df_raw.copy()
+    used_column_headers = df['data'].iloc[0].columns
+
+    df['data'] = df['data'].apply(lambda x: x.values)
+    return df, used_column_headers
+
 if __name__ == '__main__':
     root_folder = 'Shared Sepsis Data'
     csv_filename = os.path.join(root_folder, 'Sepsis_JCM.csv')
 
     print 'Loading csv...'
-    df = pd.read_csv(csv_filename)
+    df_raw = pd.read_csv(csv_filename)
 
     # only work with "good" trials
-    df = df[df['Ignore'] != True]
+    df_raw = df_raw[df_raw['Ignore'] != True]
 
     column_headers = create_column_headers()
     columns_to_drop = populate_columns_to_drop()
 
     start = time.time()
     print 'Loading data files...'
-    df = df.apply(lambda x: load_spots_files(x, root_folder, column_headers,
+    df_raw = df_raw.apply(lambda x: load_spots_files(x, root_folder, column_headers,
                                                 columns_to_drop), axis=1)
+
+    # re-order 'data' part of frame for convenience
+    # currently exists as a data frame with name columns
+    # time, 2R, 2G, 2B .... 79R, 79G, 79B
+    # need to be able to manipulate data as numpy arrays
+    # keep column headers around for later use
+    df, used_column_headers = prepare_data_frame(df_raw)
     end = time.time()
     print 'Data loaded in %d seconds' % (end-start)
+
+
 
     print 'Creating labels...'
     label_dictionaries = create_labels_dictionaries()
