@@ -5,6 +5,7 @@
 import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
+import seaborn as sns
 import ntpath
 import os
 import re
@@ -12,6 +13,8 @@ import datetime
 from sklearn.cross_validation import train_test_split, StratifiedShuffleSplit
 import time
 import rpy2
+from seriesmodel import SeriesModel
+from featurizer import PolynomialFeaturizer
 
 def timestamp_interpretter(x):
     # TODO - fix regex for timestamps of the type:
@@ -122,61 +125,74 @@ def prepare_data_frame(df_raw):
     return df, used_column_headers
 
 if __name__ == '__main__':
-    root_folder = 'Shared Sepsis Data'
-    csv_filename = os.path.join(root_folder, 'Sepsis_JCM.csv')
+    if False:
+        root_folder = 'Shared Sepsis Data'
+        csv_filename = os.path.join(root_folder, 'Sepsis_JCM.csv')
 
-    print 'Loading csv...'
-    df_raw = pd.read_csv(csv_filename)
+        print 'Loading csv...'
+        df_raw = pd.read_csv(csv_filename)
 
-    # only work with "good" trials
-    df_raw = df_raw[df_raw['Ignore'] != True]
+        # only work with "good" trials
+        df_raw = df_raw[df_raw['Ignore'] != True]
 
-    column_headers = create_column_headers()
-    columns_to_drop = populate_columns_to_drop()
+        column_headers = create_column_headers()
+        columns_to_drop = populate_columns_to_drop()
 
-    start = time.time()
-    print 'Loading data files...'
-    df_raw = df_raw.apply(lambda x: load_spots_files(x, root_folder, column_headers,
-                                                columns_to_drop), axis=1)
+        start = time.time()
+        print 'Loading data files...'
+        df_raw = df_raw.apply(lambda x: load_spots_files(x, root_folder, column_headers,
+                                                    columns_to_drop), axis=1)
 
-    # re-order 'data' part of frame for convenience
-    # currently exists as a data frame with name columns
-    # time, 2R, 2G, 2B .... 79R, 79G, 79B
-    # need to be able to manipulate data as numpy arrays
-    # keep column headers around for later use
-    df, used_column_headers = prepare_data_frame(df_raw)
-    end = time.time()
-    print 'Data loaded in %d seconds' % (end-start)
+        # re-order 'data' part of frame for convenience
+        # currently exists as a data frame with name columns
+        # time, 2R, 2G, 2B .... 79R, 79G, 79B
+        # need to be able to manipulate data as numpy arrays
+        # keep column headers around for later use
+        df, used_column_headers = prepare_data_frame(df_raw)
+        end = time.time()
+        print 'Data loaded in %d seconds' % (end-start)
 
 
 
-    print 'Creating labels...'
-    label_dictionaries = create_labels_dictionaries()
-    df = create_labels(df, label_dictionaries)
+        print 'Creating labels...'
+        label_dictionaries = create_labels_dictionaries()
+        df = create_labels(df, label_dictionaries)
 
-    # drop unwanted labels
-    df = df[df['Ignore_label'] != True]
+        # drop unwanted labels
+        df = df[df['Ignore_label'] != True]
 
-    X = df['data']
-    y = df[['classification', 'gram', 'detection']]
+        X = df['data']
+        y = df[['classification', 'gram', 'detection']]
 
-    print '\nSummary counts after cleaning:'
-    print y.groupby('gram').count()
-    print y.groupby('detection').count()
-    print y.groupby('classification').count()
+        print '\nSummary counts after cleaning:'
+        print y.groupby('gram').count()
+        print y.groupby('detection').count()
+        print y.groupby('classification').count()
 
-    print 'Test/train split...'
-    X_train, X_test, y_train, y_test = split_train_test(X,y)
-    print '\nTEST summary:'
-    print y_test.groupby('classification').count()
-    print '\nTRAIN summary:'
-    print y_train.groupby('classification').count()
+        print 'Test/train split...'
+        X_train, X_test, y_train, y_test = split_train_test(X,y)
+        print '\nTEST summary:'
+        print y_test.groupby('classification').count()
+        print '\nTRAIN summary:'
+        print y_train.groupby('classification').count()
 
-    # NOTE: can get back all of the data via df.ix[] whatever the index is
-    # in y_train, y_test, etc.
+        # NOTE: can get back all of the data via df.ix[] whatever the index is
+        # in y_train, y_test, etc.
 
-    # construct loop structure we would use
-    times = [6*3, 8*3, 12*3, 15*3] # start looking at after 6, 8, 12 and 15 hrs
-    for t in times:
-        # feed data into featurizer
-        pass
+    print 'Do some unit tests on seriesmodel, featurizer...'
+    print '1) seriesmodel preprocessing'
+    print X_test.iloc[0][0:5, 0:4]
+    print 'DI, reftime = 2'
+    sm = SeriesModel(reference_time=2)
+    DI = sm.preprocess(X_test)
+    print DI.iloc[0][0:5, 0:4]
+    print 'DII, reftime = 1'
+    sm = SeriesModel(color_vector_type='DII', reference_time=1)
+    DII = sm.preprocess(X_test)
+    print DII.iloc[0][0:5, 0:4]
+
+    print '\n\n2) PolynomialFeaturizer'
+    PF = PolynomialFeaturizer(n=4, reference_time=2)
+    mycoefs = PF.fit_transform(DI)
+    myscores = PF.scores()
+    DI_pred = PF.predict()

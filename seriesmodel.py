@@ -45,8 +45,8 @@ class SeriesModel(object):
     def __repr__(self):
         pass
 
-    def fit(self, X, y, verbose=False, reference_time=0):
-        self.X = self.preprocess(X.copy(), reference_time=reference_time)
+    def fit(self, X, y, verbose=False):
+        self.X = self.preprocess(X.copy())
         self.y = y
         self.verbose = verbose
 
@@ -59,7 +59,8 @@ class SeriesModel(object):
             self._fit_one_timestep(t)
             t += 1
 
-    def preprocess(self, X, reference_time=0):
+    def preprocess(self, X):
+        reference_time = self.reference_time
         # change color-scale as required
         # assume it's RGB
         if self.color_scale == 'CSV':
