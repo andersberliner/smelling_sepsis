@@ -30,25 +30,32 @@ class PolynomialFeaturizer(object):
         # return pd_series with same indices
         # values are regression coefficients
         ## NEED to incorporate reference_time
-        self.X = X
+        # avoid to save on space self.X = X
         poly = PolynomialFeatures(degree=self.n)
 
         # can use Ridge or Lasso here => gridsearch
         model = LinearRegression(fit_intercept=False)
 
-        self.coef_, self.scores_ = self._regress(X, model, poly)
-        return self.coef_
+        coef_, scores_ = self._regress(X, model, poly)
+        return coef_, scores_
 
-    def score(self, X=None):
-        # ugly, but trying to match sklearn form
-        return self.scores_
+    # def score(self, X=None):
+    #     # ugly, but trying to match sklearn form
+    #     # better to modify so it's using a predict, score method
+    #     # and calculating residual
+    #     return self.scores_
 
-    def predict(self):
+    # need to change this to accept the input array
+    # DONE
+    def predict(self, Z, coefs):
         # first column of Z is time
         # we will replace the other columns with regressed data
-        Z = self.X.copy()
+
+        # clean-up from before
+        # Z = self.X.copy()
+
         poly = PolynomialFeatures(degree=self.n)
-        for trial_index, (coefficients, x) in enumerate(izip(self.coef_, self.X)):
+        for trial_index, (coefficients, x) in enumerate(izip(coefs, Z)):
             # reshape required by t
             t = poly.fit_transform((x[:,0]).reshape(-1,1))
             # only regress on data past reference time

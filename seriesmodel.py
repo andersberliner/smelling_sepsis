@@ -3,7 +3,7 @@
 # 20160105
 import pandas as pd
 import numpy as np
-from sklearn.linear_model import LogisticRegression as LR
+from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from itertools import izip
@@ -25,13 +25,13 @@ class SeriesModel(object):
                     gram_model_arguments={},
                     gram_preprocessor='PCA',
                     gram_preprocessor_arguments={},
-                    gram_featurizer='poly',
+                    gram_featurizer='detection',
                     gram_featurizer_arguments={},
                     classification_model='LR',
                     classification_model_arguments={},
                     classification_preprocessor='PCA',
                     classification_preprocessor_arguments={},
-                    classification_featurizer='poly',
+                    classification_featurizer='gram',
                     classification_featurizer_arguments={}):
         self.X = X
         self.y = y
@@ -46,7 +46,9 @@ class SeriesModel(object):
 
         # self.models is a group of models for detection, gram, classification
         # at each timepoint
-        self.models = defaultdict(list)
+        self.models = defaultdict(dict)
+        self.featurizers = defaultdict(dict)
+        self.preprocessors = defaultdict(dict)
 
         # set base models and preprocessors
         self.detection_base_model = detection_model
@@ -61,45 +63,58 @@ class SeriesModel(object):
         self.classification_base_preprocessor = classification_preprocessor
         self.classification_base_featurizer = classification_featurizer
 
+        self.detection_base_model_arguments = detection_model_arguments
+        self.detection_base_preprocessor_arguments = detection_preprocessor_arguments
+        self.detection_base_featurizer_arguments = detection_featurizer_arguments
+
+        self.gram_base_model_arguments = gram_model_arguments
+        self.gram_base_preprocessor_arguments = gram_preprocessor_arguments
+        self.gram_base_featurizer_arguments = gram_featurizer_arguments
+
+        self.classification_base_model_arguments = classification_model_arguments
+        self.classification_base_preprocessor_arguments = classification_preprocessor_arguments
+        self.classification_base_featurizer_arguments = classification_featurizer_arguments
+
     def __repr__(self):
         pass
 
-    def _build_results_dataframes(self):
-        self.predictions = self.y.copy()
-        self.probabilities = self.y.copy()
+    def _build_results_dataframes(self, y):
+        self.predictions = y.copy()
+        self.probabilities = y.copy()
 
-        for col in self.y.columns:
+        for col in y.columns:
             self.predictions[col] = self.predictions[col].apply(lambda x: [])
             self.probabilities[col] = self.probabilities[col].apply(lambda x: [])
 
         # for all of our metrics, build a pandas dataframe column
         df_columns = ['time']
         self.metrics = ['confusion', 'accuracy', 'sensitivity', 'recall']
-        for label_type in self.y.columns:
+        for label_type in y.columns:
             for metric in self.metrics:
                 df_columns.append(label_type + '_' + metric)
         self.scores = pd.DataFrame(columns=df_columns)
 
         self.confusion_labels = {}
-        for col in self.y.columns:
-            self.confusion_labels[col] = self.y[col].unique()
+        for col in y.columns:
+            self.confusion_labels[col] = y[col].unique()
 
     def _prepare_data(self, X, y):
-        self.X = self.preprocess(X.copy())
-        self.y = y
+        Z = self.preprocess(X.copy())
 
-        self._build_results_dataframes()
-        self.trial_lengths = self.find_trial_lengths(self.X)
-        self.inspect_trial_shapes(self.X)
+        self._build_results_dataframes(y)
+        self.trial_lengths = self.find_trial_lengths(Z)
+        self.inspect_trial_shapes(Z)
+
+        return Z
 
     def fit(self, X, y, verbose=False):
         self.verbose = verbose
-        self._prepare_data(X,y)
+        X = self._prepare_data(X,y)
 
         # start with the second time
         t = 1
         while t < self.trial_lengths.max():
-            self._fit_one_timestep(t)
+            self._fit_one_timestep(X, t)
             t += 1
 
     def preprocess(self, X):
@@ -142,66 +157,168 @@ class SeriesModel(object):
         return X
 
 
-    def _featurize_detection(self, X_train):
-        if self.detection_featurizer == 'poly':
-            featurizer = PolynomialFeaturizer()
-        X_detection = self.detection_featurizer(X_train)
-        return X_detection
+    def _featurize_class(self, X_train, featurizer_type, featurizer_arguments):
+        X_features = X_train.copy()
+        if not featurizer_type:
+            return X_features
 
-    def _featurize_gram(self, X_train):
-        # featurizer = PolynomialFeaturizer()
-        X_gram = self.gram_featurizer(X_train)
-        return X_gram
+        if featurizer_type == 'poly':
+            featurizer = PolynomialFeaturizer(**featurizer_arguments)
+        elif featurizer_type == 'kink':
+            pass
+        elif featurizer_type == 'sigmoid':
+            pass
+        elif featurizer_type == 'forecast':
+            pass
+        elif featurizer_type == 'longitudinal':
+            pass
 
-    def _featurize_classification(self, X_train):
-        # featurizer = PolynomialFeaturizer()
-        X_classification = self.classification_featurizer(X_train)
-        return X_classification
+        X_features = featurizer.fit_transform(X_train)
+        print X_features.head()
+        # need to flatten the features
+        X_flat = X_features.apply(lambda x: x.flatten())
+        return X_features, featurizer
 
-    def _featurize(self, X_train):
-        X_detection = self._featurize_detection(X_train)
+    # def _featurize_gram(self, X_train):
+    #     # featurizer = PolynomialFeaturizer()
+    #     if self.detection_featurizer == 'poly':
+    #         featurizer = PolynomialFeaturizer()
+    #     X_gram = featurizer(X_train)
+    #     return X_gram
+    #
+    # def _featurize_classification(self, X_train):
+    #     # featurizer = PolynomialFeaturizer()
+    #     X_classification = self.classification_featurizer(X_train)
+    #     return X_classification
+
+    def _featurize(self, X_train, number_of_times):
+        # detection
+        X_detection, detection_featurizer = self._featurize_class(X_train,
+                                self.detection_base_featurizer,
+                                self.detection_base_featurizer_arguments)
+        self.featurizers['detection'][number_of_times] = detection_featurizer
         # for efficiency, if not using different methods, could have
         # all 3 be the same
-        X_gram = self._featurize_gram(X_train)
-        X_classification = self._featurize_classification(X_train)
+        # gram
+        if self.gram_base_featurizer == 'detection':
+            X_gram = X_detection.copy()
+            gram_featurizer = detection_featurizer
+        else:
+            X_gram, gram_featurizer = self._featurize_class(X_train,
+                                    self.gram_base_featurizer,
+                                    self.gram_base_featurizer_arguments)
+        self.featurizers['gram'][number_of_times] = gram_featurizer
+
+        # classification
+        if self.classification_base_featurizer == 'detection':
+            X_classification = X_detection.copy()
+            classification_featurizer = detection_featurizer
+        elif self.classification_base_featurizer == 'gram':
+            X_classification = X_gram.copy()
+            classification_featurizer = gram_featurizer
+        else:
+            X_classification = self._featurize_class(X_train,
+                                    self.classification_base_featurizer,
+                                    self.classification_base_featurizer_arguments)
+            self.featurizers['classification'][number_of_times] = classification_featurizer
 
         return X_detection, X_gram, X_classification
 
-    def _fit_one_timestep(self, number_of_times):
+    def _fit_class(self, X_train, y_train, model_type, model_argmuents, step=None):
+        if model_type == 'LR':
+            model = LogisticRegression(**model_argmuents)
+        elif model_type == 'RF':
+            pass
+        elif model_type == 'SVM':
+            pass
+        elif model_type == 'longitudinal':
+            pass
+        else:
+            print 'Invalid model_type %s for %s' % (model_type, step)
+
+        model.fit(X_train, y_train)
+
+        return model
+
+    def _pandas_to_numpy(self, df_X):
+        # features are in a pandas dataframe of the format
+        #  trial    features
+        #  1        [[f11, f12, ...,f1n],
+        #            [f21,...],
+        #            ....
+        #            [fp1, fp2, ..., fpn]]
+        #  2         number_spot_features X number_of_spots
+        #
+        # All sklearn need np array of shape
+        #    number_trials X number_features
+        np_X = [x.flatten for x in df_X.values]
+        np_X = tuple(np_X)
+        np_X = np.vstack(np_X)
+
+        np_y = d_y.values
+        return np_X
+
+    def _fit_one_timestep(self, X, number_of_times):
         # subset the data
-        X_train = self._subset_data(self.X, number_of_times)
-        y_train = self._subset_data(self.y, number_of_times)
+        X_train = self._subset_data(X, number_of_times)
+        y_train = self._subset_data(y, number_of_times)
 
         # featurize
-        X_detection, X_gram, X_classification = self._featurize(X_train)
-
+        X_detection, X_gram, X_classification = self._featurize(X_train, number_of_times)
+        np_X_detection = self._pandas_to_numpy(X_detection)
         # fit detection
-        detection_model = self.fit_detection(X_detection, y_train['detection'])
+        # detection_model = self.fit_detection(X_detection, y_train['detection'])
+        detection_model = self._fit_class(np_X_detection,
+                                y_train['detection'].values,
+                                self.detection_base_model,
+                                self.detection_base_model_arguments,
+                                step=('detection t=%d' % number_of_times))
+
+        # store model
+        self._models['detection'][number_of_times] = detection_model
 
         # predict detection and probabilities.
         # Use as features to fit gram
-        y_predict_detection = detection_model.predict(X_detection)
-        y_probabilities_detection = detection_model.predict_proba(X_detection)
+        y_predict_detection = detection_model.predict(np_X_detection)
+        y_probabilities_detection = detection_model.predict_proba(np_X_detection)
 
         # fit gram
-        X_gram = np.hstack((X_gram, y_predict_detection.reshape(-1,1),
+        np_X_gram = self._pandas_to_numpy(X_gram)
+        np_X_gram = np.hstack((np_X_gram, y_predict_detection.reshape(-1,1),
                             y_probabilities_detection[:,1].reshape(-1,1)))
-        gram_model = self.fit_gram(X_gram, y_train['gram'])
+        gram_model = self._fit_class(np_X_gram,
+                                y_train['gram'].values,
+                                self.gram_base_model,
+                                self.gram_base_model_arguments,
+                                step=('gram t=%d' % number_of_times))
+
+        # store model
+        self._models['gram'][number_of_times] = gram_model
 
         # predict gram and probabilities.
         # Use as features to fit classification
-        y_predict_gram = gram_model.predict(X_gram)
-        y_probabilities_gram = gram_model.predict_proba(X_gram)
+        y_predict_gram = gram_model.predict(np_X_gram)
+        y_probabilities_gram = gram_model.predict_proba(np_X_gram)
 
         # fit classification
-        X_classification = X_gram = np.hstack((X_classification,
+        np_X_classification = self._pandas_to_numpy(X_classification)
+        np_X_classification = np.hstack((np_X_classification,
                             y_predict_detection.reshape(-1,1),
                             y_probabilities_detection[:,1].reshape(-1,1),
                             y_predict_gram.reshape(-1,1),
                             y_probabilities_gram[:,2]))
-        classification_model = self.fit_classification(X_classification, y_train['classification'])
-        y_predict_classification = classification_model.predict(X_classification)
-        y_probabilities_classification = classification_model.predict_proba(X_classification)
+        # classification_model = self.fit_classification(np_X_classification, y_train['classification'])
+        classification_model = self._fit_class(np_X_classification, y_train['classification'],
+                                self.classification_base_model,
+                                self.classification_base_model_arguments,
+                                step=('classification t=%d' % number_of_times))
+
+        # store model
+        self._models['classification'][number_of_times] = classification_model
+
+
+        y_predict_classification = classification_model.predict(np_X_classification)
+        y_probabilities_classification = classification_model.predict_proba(np_X_classification)
 
         # score and write to predictions, probabilities, scores
         self.score(number_of_times, y_predict_detection, y_predict_gram, y_predict_classification)

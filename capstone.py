@@ -125,7 +125,12 @@ def prepare_data_frame(df_raw):
     df['data'] = df['data'].apply(lambda x: x.values)
     return df, used_column_headers
 
+def find_nans(df):
+    return df[df.apply(lambda x: int(np.isnan(x))) > 0]
+
 if __name__ == '__main__':
+    verbose = True
+
     if True:
         root_folder = 'Shared Sepsis Data'
         csv_filename = os.path.join(root_folder, 'Sepsis_JCM.csv')
@@ -153,8 +158,6 @@ if __name__ == '__main__':
         end = time.time()
         print 'Data loaded in %d seconds' % (end-start)
 
-
-
         print 'Creating labels...'
         label_dictionaries = create_labels_dictionaries()
         df = create_labels(df, label_dictionaries)
@@ -165,63 +168,114 @@ if __name__ == '__main__':
         X = df['data']
         y = df[['classification', 'gram', 'detection']]
 
-        print '\nSummary counts after cleaning:'
-        print y.groupby('gram').count()
-        print y.groupby('detection').count()
-        print y.groupby('classification').count()
+        if verbose:
+            print '\nSummary counts after cleaning:'
+            print y.groupby('gram').count()
+            print y.groupby('detection').count()
+            print y.groupby('classification').count()
 
         print 'Test/train split...'
         X_train, X_test, y_train, y_test = split_train_test(X,y)
-        print '\nTEST summary:'
-        print y_test.groupby('classification').count()
-        print '\nTRAIN summary:'
-        print y_train.groupby('classification').count()
+
+        if verbose:
+            print '\nTEST summary:'
+            print y_test.groupby('classification').count()
+            print '\nTRAIN summary:'
+            print y_train.groupby('classification').count()
 
         # NOTE: can get back all of the data via df.ix[] whatever the index is
         # in y_train, y_test, etc.
 
     print 'Do some unit tests on seriesmodel, featurizer...'
-    print '0) Set-up'
+    print '0) Set-up (prepare data)'
     sm = SeriesModel(reference_time=2)
-    sm._prepare_data(X_test, y_test)
-    print 'Predictions'
-    print sm.predictions.head()
-    print 'Probabilities'
-    print sm.probabilities.head()
-    print 'Metrics'
-    print sm.metrics
-    print 'Confusion Labels'
-    print sm.confusion_labels
-    print 'Scores'
-    print sm.scores.head()
-
-    print '1) Breaking apart fit_one_timestep...'
-    print 'A) Subset data'
-    X_sub = sm._subset_data(sm.X, 4)
-    print X_sub.shape, X_sub.iloc[0].shape, sm.X.shape, sm.X.iloc[0].shape
-    print sm.X.iloc[0][0:5,0:5]
-    print X_sub.iloc[0][:,0:5]
-    print 'B) Featurize'
-
 
     if True:
-        print '1) seriesmodel preprocessing'
-        # print X_test.iloc[0][0:5, 0:4]
-        # print 'DI, reftime = 2'
+        print 'A) seriesmodel preprocessing'
+        if verbose:
+            print X_test.iloc[0][0:5, 0:4]
+        print 'DI, reftime = 2'
         DI = sm.preprocess(X_test)
-        # print DI.iloc[0][0:5, 0:4]
-        # print 'DII, reftime = 1'
+        if verbose:
+            print DI.iloc[0][0:5, 0:4]
+        print 'DII, reftime = 1'
         sm = SeriesModel(color_vector_type='DII', reference_time=1)
         DII = sm.preprocess(X_test)
-        # print DII.iloc[0][0:5, 0:4]
+        if verbose:
+            print DII.iloc[0][0:5, 0:4]
 
+    Z = sm._prepare_data(X_test, y_test)
+
+    if True:
+        print 'B) Set-up results dataframes'
+        if verbose:
+            print 'Predictions'
+            print sm.predictions.head()
+            print 'Probabilities'
+            print sm.probabilities.head()
+            print 'Metrics'
+            print sm.metrics
+            print 'Confusion Labels'
+            print sm.confusion_labels
+            print 'Scores'
+            print sm.scores.head()
+
+    print '1) Fit one timestep...'
+    if True:
+        print 'A) Subset data'
+        nt = 4
+        X_sub = sm._subset_data(Z, nt)
+
+        if verbose:
+            print X_sub.shape, X_sub.iloc[0].shape, Z.shape, Z.iloc[0].shape
+            print Z.iloc[0][0:5,0:5]
+            print X_sub.iloc[0][:,0:5]
+
+        print 'B) Featurize data'
+        print 'i) Try all the same featurizer'
+        Xd, Xg, Xc = sm._featurize(X_sub, nt)
+
+        if verbose:
+            print Xd.head()
+            print Xg.head()
+            print Xc.head()
+
+        print 'ii) Try all different featurizers'
+        sm.gram_base_featurizer_arguments = {'n':6}
+        sm.gram_base_featurizer = 'poly'
+        sm.classification_base_featurizer = None
+        Xd2, Xg2, Xc2 = sm._featurize(X_sub, nt)
+
+        if verbose:
+            print Xd2.head()
+            print Xg2.head()
+            print Xc2.head()
+
+    print 'C) Run detection model'
+    nt = 30
+    X_sub = sm._subset_data(Z, nt)
+    y_sub = sm._subset_data(y_test, nt)
+    Xd, Xg, Xc = sm._featurize(X_sub, nt)
+
+    print 'i) Convert featurized data to np array'
+    np_Xd = sm._pandas_to_numpy(Xd)
+    print np_Xd.shape
+    print y_sub['detection'].values.shape
+    detection_model = sm._fit_class(Xd, y_train['detection'],
+                            'LR',
+                            sm.detection_base_model_arguments,
+                            step=('detection t=%d' % nt))
+
+
+
+    if False:
         print '\n\n2) PolynomialFeaturizer'
         start = time.time()
 
         PF = PolynomialFeaturizer(n=4, reference_time=2, verbose=True)
-        mycoefs = PF.fit_transform(DI)
-        myscores = PF.score()
-        DI_pred = PF.predict()
+        mycoefs, myscores = PF.fit_transform(DI)
+        # myscores = PF.score()
+        DI_pred = PF.predict(DI, mycoefs)
 
         end = time.time()
         print 'Featurized, predicted %d test trails in %d seconds' % (len(y_test),(end-start))

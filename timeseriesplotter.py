@@ -14,12 +14,12 @@ class SpotTimePlot(object):
     # may add kargs for other plotting options
     def __init__(self, y, column_headers,
                 rows_per_page=3, cols_per_page=4,
-                subset=False, subset_size=10, n_trial_groups=3,
+                subset=False, subset_size=10, n_trial_groups=2,
                 verbose=False):
 
         self.y = y
         self.groups = y['classification'].unique()
-
+        self.groups.sort()
         self.column_headers = column_headers
         self.column_hash = {v:i for i,v in enumerate(self.column_headers)}
         self.subset = subset
