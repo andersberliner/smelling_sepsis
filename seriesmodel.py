@@ -8,18 +8,33 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from itertools import izip
 from collections import defaultdict
+from featurizer import PolynomialFeaturizer
 
 class SeriesModel(object):
     def __init__(self, X=None, y=None,
-            color_scale = 'RGB', color_vector_type = 'DI',
-            reference_time = 0,
-            detection_model=LR, detection_preprocessor=PCA,
-            gram_model=LR, gram_preprocessor=PCA,
-            classification_model=LR, classification_preprocessor=PCA):
+                    color_scale = 'RGB',
+                    color_vector_type = 'DI',
+                    reference_time = 0,
+                    detection_model='LR',
+                    detection_model_arguments={},
+                    detection_preprocessor='pca',
+                    detection_preprocessor_arguments={},
+                    detection_featurizer='poly',
+                    detection_featurizer_arguments={},
+                    gram_model='LR',
+                    gram_model_arguments={},
+                    gram_preprocessor='PCA',
+                    gram_preprocessor_arguments={},
+                    gram_featurizer='poly',
+                    gram_featurizer_arguments={},
+                    classification_model='LR',
+                    classification_model_arguments={},
+                    classification_preprocessor='PCA',
+                    classification_preprocessor_arguments={},
+                    classification_featurizer='poly',
+                    classification_featurizer_arguments={}):
         self.X = X
         self.y = y
-        self.predictions = None
-        self.scores = None
 
         self.color_scale = color_scale
         self.color_vector_type = color_vector_type
@@ -36,22 +51,50 @@ class SeriesModel(object):
         # set base models and preprocessors
         self.detection_base_model = detection_model
         self.detection_base_preprocessor = detection_preprocessor
+        self.detection_base_featurizer = detection_featurizer
+
         self.gram_base_model = gram_model
         self.gram_base_preprocessor = gram_preprocessor
+        self.gram_base_featurizer = gram_featurizer
+
         self.classification_base_model = classification_model
         self.classification_base_preprocessor = classification_preprocessor
-
+        self.classification_base_featurizer = classification_featurizer
 
     def __repr__(self):
         pass
 
-    def fit(self, X, y, verbose=False):
+    def _build_results_dataframes(self):
+        self.predictions = self.y.copy()
+        self.probabilities = self.y.copy()
+
+        for col in self.y.columns:
+            self.predictions[col] = self.predictions[col].apply(lambda x: [])
+            self.probabilities[col] = self.probabilities[col].apply(lambda x: [])
+
+        # for all of our metrics, build a pandas dataframe column
+        df_columns = ['time']
+        self.metrics = ['confusion', 'accuracy', 'sensitivity', 'recall']
+        for label_type in self.y.columns:
+            for metric in self.metrics:
+                df_columns.append(label_type + '_' + metric)
+        self.scores = pd.DataFrame(columns=df_columns)
+
+        self.confusion_labels = {}
+        for col in self.y.columns:
+            self.confusion_labels[col] = self.y[col].unique()
+
+    def _prepare_data(self, X, y):
         self.X = self.preprocess(X.copy())
         self.y = y
-        self.verbose = verbose
 
+        self._build_results_dataframes()
         self.trial_lengths = self.find_trial_lengths(self.X)
         self.inspect_trial_shapes(self.X)
+
+    def fit(self, X, y, verbose=False):
+        self.verbose = verbose
+        self._prepare_data(X,y)
 
         # start with the second time
         t = 1
@@ -99,43 +142,74 @@ class SeriesModel(object):
         return X
 
 
+    def _featurize_detection(self, X_train):
+        if self.detection_featurizer == 'poly':
+            featurizer = PolynomialFeaturizer()
+        X_detection = self.detection_featurizer(X_train)
+        return X_detection
+
+    def _featurize_gram(self, X_train):
+        # featurizer = PolynomialFeaturizer()
+        X_gram = self.gram_featurizer(X_train)
+        return X_gram
+
+    def _featurize_classification(self, X_train):
+        # featurizer = PolynomialFeaturizer()
+        X_classification = self.classification_featurizer(X_train)
+        return X_classification
+
+    def _featurize(self, X_train):
+        X_detection = self._featurize_detection(X_train)
+        # for efficiency, if not using different methods, could have
+        # all 3 be the same
+        X_gram = self._featurize_gram(X_train)
+        X_classification = self._featurize_classification(X_train)
+
+        return X_detection, X_gram, X_classification
 
     def _fit_one_timestep(self, number_of_times):
         # subset the data
         X_train = self._subset_data(self.X, number_of_times)
         y_train = self._subset_data(self.y, number_of_times)
 
+        # featurize
+        X_detection, X_gram, X_classification = self._featurize(X_train)
+
         # fit detection
-        X_detection = self._featurize_detection(X_train)
-        self.model.fit(X_detection, y_train['detection'])
+        detection_model = self.fit_detection(X_detection, y_train['detection'])
+
         # predict detection and probabilities.
-        #Use as features to fit gram
-        y_predict_detection = self.model.predict(X_detection)
-        y_probabilities_detection = self.model.predict_proba(X_detection)
+        # Use as features to fit gram
+        y_predict_detection = detection_model.predict(X_detection)
+        y_probabilities_detection = detection_model.predict_proba(X_detection)
 
         # fit gram
-        X_gram = self._featurize_gram(X_train, y_predict_detection, y_probabilities_detection)
-        self.model.fit(X_gram, y_train['gram'])
+        X_gram = np.hstack((X_gram, y_predict_detection.reshape(-1,1),
+                            y_probabilities_detection[:,1].reshape(-1,1)))
+        gram_model = self.fit_gram(X_gram, y_train['gram'])
+
         # predict gram and probabilities.
         # Use as features to fit classification
-        y_predict_gram = self.model.predict(X_gram)
-        y_probabilities_gram = self.model.predict_proba(X_gram)
+        y_predict_gram = gram_model.predict(X_gram)
+        y_probabilities_gram = gram_model.predict_proba(X_gram)
 
         # fit classification
-        X_classification = self._featurize_classification(X_train, y_predict_gram, y_probabilities_gram)
-        self.model.fit(X_classification, y_train['classification'])
-        y_predict_classification = self.model.predict(X_classification)
-        y_probabilities_classification = self.model.predict_proba(X_classification)
+        X_classification = X_gram = np.hstack((X_classification,
+                            y_predict_detection.reshape(-1,1),
+                            y_probabilities_detection[:,1].reshape(-1,1),
+                            y_predict_gram.reshape(-1,1),
+                            y_probabilities_gram[:,2]))
+        classification_model = self.fit_classification(X_classification, y_train['classification'])
+        y_predict_classification = classification_model.predict(X_classification)
+        y_probabilities_classification = classification_model.predict_proba(X_classification)
 
-        # score
-        y_predict = self.agglomerate_predictions(y_predict_detection, y_predict_gram, y_predict_classification)
-
-        self.add_scores(y_predict, number_of_times)
+        # score and write to predictions, probabilities, scores
+        self.score(number_of_times, y_predict_detection, y_predict_gram, y_predict_classification)
 
     def _subset_data(self, Z, number_of_times):
         z_sub = Z.copy()
-        z_sub['data'] = z_sub['data'].apply(lambda x: x.iloc[0:number_of_times].values)
-        return z_sub.values
+        z_sub= z_sub.apply(lambda x: x[0:number_of_times])
+        return z_sub
 
     def _featurize_detection(self, X_train):
         pass
@@ -152,8 +226,9 @@ class SeriesModel(object):
     def _predict_one_timestep(self, X, number_of_times):
         pass
 
-    def score(self):
-        pass
+    def score(self, number_of_times, y_predict_detection, y_predict_gram, y_predict_classification):
+        confusion = {}
+        accuracy = {}
 
     def _score_one_timestep(self):
         pass

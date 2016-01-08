@@ -15,6 +15,7 @@ import time
 import rpy2
 from seriesmodel import SeriesModel
 from featurizer import PolynomialFeaturizer
+from timeseriesplotter import SpotTimePlot
 
 def timestamp_interpretter(x):
     # TODO - fix regex for timestamps of the type:
@@ -125,7 +126,7 @@ def prepare_data_frame(df_raw):
     return df, used_column_headers
 
 if __name__ == '__main__':
-    if False:
+    if True:
         root_folder = 'Shared Sepsis Data'
         csv_filename = os.path.join(root_folder, 'Sepsis_JCM.csv')
 
@@ -180,19 +181,53 @@ if __name__ == '__main__':
         # in y_train, y_test, etc.
 
     print 'Do some unit tests on seriesmodel, featurizer...'
-    print '1) seriesmodel preprocessing'
-    print X_test.iloc[0][0:5, 0:4]
-    print 'DI, reftime = 2'
+    print '0) Set-up'
     sm = SeriesModel(reference_time=2)
-    DI = sm.preprocess(X_test)
-    print DI.iloc[0][0:5, 0:4]
-    print 'DII, reftime = 1'
-    sm = SeriesModel(color_vector_type='DII', reference_time=1)
-    DII = sm.preprocess(X_test)
-    print DII.iloc[0][0:5, 0:4]
+    sm._prepare_data(X_test, y_test)
+    print 'Predictions'
+    print sm.predictions.head()
+    print 'Probabilities'
+    print sm.probabilities.head()
+    print 'Metrics'
+    print sm.metrics
+    print 'Confusion Labels'
+    print sm.confusion_labels
+    print 'Scores'
+    print sm.scores.head()
 
-    print '\n\n2) PolynomialFeaturizer'
-    PF = PolynomialFeaturizer(n=4, reference_time=2)
-    mycoefs = PF.fit_transform(DI)
-    myscores = PF.scores()
-    DI_pred = PF.predict()
+    print '1) Breaking apart fit_one_timestep...'
+    print 'A) Subset data'
+    X_sub = sm._subset_data(sm.X, 4)
+    print X_sub.shape, X_sub.iloc[0].shape, sm.X.shape, sm.X.iloc[0].shape
+    print sm.X.iloc[0][0:5,0:5]
+    print X_sub.iloc[0][:,0:5]
+    print 'B) Featurize'
+
+
+    if True:
+        print '1) seriesmodel preprocessing'
+        # print X_test.iloc[0][0:5, 0:4]
+        # print 'DI, reftime = 2'
+        DI = sm.preprocess(X_test)
+        # print DI.iloc[0][0:5, 0:4]
+        # print 'DII, reftime = 1'
+        sm = SeriesModel(color_vector_type='DII', reference_time=1)
+        DII = sm.preprocess(X_test)
+        # print DII.iloc[0][0:5, 0:4]
+
+        print '\n\n2) PolynomialFeaturizer'
+        start = time.time()
+
+        PF = PolynomialFeaturizer(n=4, reference_time=2, verbose=True)
+        mycoefs = PF.fit_transform(DI)
+        myscores = PF.score()
+        DI_pred = PF.predict()
+
+        end = time.time()
+        print 'Featurized, predicted %d test trails in %d seconds' % (len(y_test),(end-start))
+
+        # need to add curve visualization here to do a sanity check
+        # on the data
+        print 'Curve visualization...'
+        STP = SpotTimePlot(y_test, used_column_headers)
+        STP.plot_fits(DI, DI_pred)
