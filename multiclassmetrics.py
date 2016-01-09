@@ -2,9 +2,7 @@
 # Anders Berliner
 # 20160108
 
-from sklearn.metrics import confusion_matrix, recall_score, accuracy_score, \
-            precision_score, f1_score, classification_report
-from collections import Counter
+from sklearn.metrics import confusion_matrix, classification_report
 from itertools import izip
 import numpy as np
 
@@ -157,46 +155,13 @@ if __name__ == '__main__':
     scores = scores_ovr(yt,yp,[1,2,3])
 
     print 'See results for toy dataset since sklearn is unreliable'
+    print 'SKLEARN confusion matrix, transposed'
+    print np.transpose(confusion_matrix(yt,yp, [1,2,3]))
+    print 'My confusion matrix'
     print cm
+    print 'Accuracy, Precision, Recall, F1-score'
     print scores
-
-
+    print 'SKLEARN classification report'
     print classification_report(yt,yp,[1,2,3])
+    print 'My classification report'
     print classification_report_ovr(yt,yp,[1,2,3])
-
-    # ecm = np.array([[6,3,1],[3,5,2],[1,1,8]])
-    # scm = confusion_matrix(yt, yp)
-    # mcm = []
-    #
-    # er = np.array([6./10, 5./10, 8./10])
-    # sr = np.array([recall_score(yt,yp, pos_label=1), recall_score(yt,yp,pos_label=2), recall_score(yt,yp,pos_label=3)])
-    # mr = []
-    #
-    # ep = np.array([6./10, 5./9, 8./11])
-    # sp = np.array([precision_score(yt,yp, pos_label=1), precision_score(yt,yp,pos_label=2), precision_score(yt,yp,pos_label=3)])
-    # mp = []
-    #
-    #
-    # print 'Expected CM:'
-    # print ecm
-    # print 'Sklearn'
-    # print scm
-    # print 'My implementation'
-    # print mcm
-    #
-    # print
-    # print 'Expected recalls'
-    # print er
-    # print 'Sklearn'
-    # print sr
-    # print 'My implementation'
-    # print
-    #
-    # print
-    # print 'Expected precisions'
-    #
-    # print ep
-    # print 'Sklearn'
-    # print sp
-    # print 'My implementation'
-    # print
