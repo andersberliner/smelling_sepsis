@@ -6,7 +6,7 @@ from sklearn.preprocessing import PolynomialFeatures
 import numpy as np
 import pandas as pd
 from itertools import izip
-
+import time
 
 class PolynomialFeaturizer(object):
     def __init__(self, n=4, reference_time=0, verbose=False):
@@ -73,6 +73,9 @@ class PolynomialFeaturizer(object):
 
 
     def _regress(self, X, model, poly):
+        # timing of the regress step
+        start = time.time()
+
         number_of_spots = X.iloc[0].shape[1]-1
         self.number_of_spots = number_of_spots
         coef_ = X.copy()
@@ -103,6 +106,9 @@ class PolynomialFeaturizer(object):
                     scores[spot_index] = model.score(t, x[self.reference_time:, column_index])
             coef_.iloc[trial_index] = coefficients
             scores_.iloc[trial_index] = scores
+
+        end = time.time()
+        print 'Regressed %d trials, n=%d in %d seconds' % (len(X), self.n, (end-start))
         return coef_, scores_
 
 

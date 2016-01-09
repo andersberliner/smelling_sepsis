@@ -96,7 +96,9 @@ class SeriesModel(object):
 
         self.confusion_labels = {}
         for col in y.columns:
-            self.confusion_labels[col] = y[col].unique()
+            groups = y[col].unique()
+            groups.sort()
+            self.confusion_labels[col] = groups
 
     def _prepare_data(self, X, y):
         Z = self.preprocess(X.copy())
@@ -173,8 +175,9 @@ class SeriesModel(object):
         elif featurizer_type == 'longitudinal':
             pass
 
-        X_features = featurizer.fit_transform(X_train)
-        print X_features.head()
+        X_features, scores = featurizer.fit_transform(X_train)
+        # print X_features.head()
+
         # need to flatten the features
         X_flat = X_features.apply(lambda x: x.flatten())
         return X_features, featurizer
@@ -217,10 +220,11 @@ class SeriesModel(object):
             X_classification = X_gram.copy()
             classification_featurizer = gram_featurizer
         else:
-            X_classification = self._featurize_class(X_train,
+            X_classification, classification_featurizer = self._featurize_class(X_train,
                                     self.classification_base_featurizer,
                                     self.classification_base_featurizer_arguments)
-            self.featurizers['classification'][number_of_times] = classification_featurizer
+
+        self.featurizers['classification'][number_of_times] = classification_featurizer
 
         return X_detection, X_gram, X_classification
 
@@ -251,11 +255,10 @@ class SeriesModel(object):
         #
         # All sklearn need np array of shape
         #    number_trials X number_features
-        np_X = [x.flatten for x in df_X.values]
+        np_X = [x.flatten() for x in df_X.values]
         np_X = tuple(np_X)
         np_X = np.vstack(np_X)
 
-        np_y = d_y.values
         return np_X
 
     def _fit_one_timestep(self, X, number_of_times):

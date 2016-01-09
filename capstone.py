@@ -16,6 +16,7 @@ import rpy2
 from seriesmodel import SeriesModel
 from featurizer import PolynomialFeaturizer
 from timeseriesplotter import SpotTimePlot
+from collections import defaultdict
 
 def timestamp_interpretter(x):
     # TODO - fix regex for timestamps of the type:
@@ -103,10 +104,10 @@ def create_labels(df, label_dictionaries):
 
     return df
 
-def split_train_test(X, y):
+def split_train_test(X, y, test_size=0.25):
     # X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=1,
     #                                                 stratify=y['classification'].unique())
-    sss = StratifiedShuffleSplit(y=y['classification'], n_iter=1, test_size=0.25, random_state=1)
+    sss = StratifiedShuffleSplit(y=y['classification'], n_iter=1, test_size=test_size, random_state=1)
     for train_index, test_index in sss:
         print 'Train: ', len(train_index)
         print 'Test: ', len(test_index)
@@ -126,10 +127,34 @@ def prepare_data_frame(df_raw):
     return df, used_column_headers
 
 def find_nans(df):
-    return df[df.apply(lambda x: int(np.isnan(x))) > 0]
+    return df[df.apply(lambda x: int(np.sum(np.isnan(x)))) > 0]
+
+
+def find_bad_rows(x, Imax, Imin):
+    x = x.drop('time', axis=1)
+    bad_rows = []
+    for i, row in x.iterrows():
+        # if i%100 == 0:
+        #     print i
+
+        if (np.sum(Imin >= row) + np.sum(row >= Imax)) > 0:
+            bad_rows.append(i)
+
+    return bad_rows
+
+def find_data_anomalies(df, Imax=4096.0, Imin=0.0):
+    anomalies = defaultdict(list)
+
+    an_df = df.apply(lambda x: (find_bad_rows(x['data'], Imax, Imin), x['Folder']), axis=1)
+    #print an_df
+    an_df = an_df.map(lambda x: x if x[0] else False)
+    #print an_df
+    an_df = an_df[an_df > 1]
+
+    return an_df
 
 if __name__ == '__main__':
-    verbose = True
+    verbose = False
 
     if True:
         root_folder = 'Shared Sepsis Data'
@@ -148,6 +173,39 @@ if __name__ == '__main__':
         print 'Loading data files...'
         df_raw = df_raw.apply(lambda x: load_spots_files(x, root_folder, column_headers,
                                                     columns_to_drop), axis=1)
+        end = time.time()
+        print 'Data loaded in %d seconds (%d total trials)' % ((end-start), len(df_raw))
+
+        # DATA INSPECTION - finding values outside of 0, 4096
+        # Reference_time must be greater than 1 if we use DII
+        # see code and snippet below
+        # All trials from the same day and at the same time (1: 20 minutes)
+        # ==> instrumentation error at that time
+        if verbose:
+            start = time.time()
+            print 'Finding anomalous trials...'
+            an_df = find_data_anomalies(df_raw)
+            end = time.time()
+            print 'Anomalous trial found in %d seconds (%d trials):' % ((end-start), len(an_df))
+            print an_df
+
+            '''
+            Finding anomalous trials...
+            Anomalous trial found in 44 seconds (13 trials):
+            372          ([1], 20120504\BCB\E. coli 25922 10 CFU\F1)
+            373         ([1], 20120504\BCB\E. coli 25922 10 CFU\F16)
+            374        ([1], 20120504\BCB\S. aureus 29213 10 CFU\F7)
+            375       ([1], 20120504\BCB\S. aureus 29213 10 CFU\F12)
+            376       ([1], 20120504\BCB\S. aureus 29213 10 CFU\F21)
+            377     ([1], 20120504\BCB\S. maltophilia Clinical A\F4)
+            378    ([1], 20120504\BCB\S. maltophilia Clinical A\F13)
+            379    ([1], 20120504\BCB\S. maltophilia Clinical A\F18)
+            380    ([1], 20120504\BCB\S. maltophilia Clinical A\F23)
+            381     ([1], 20120504\BCB\S. maltophilia Clinical B\F5)
+            382    ([1], 20120504\BCB\S. maltophilia Clinical B\F10)
+            383    ([1], 20120504\BCB\S. maltophilia Clinical B\F15)
+            384    ([1], 20120504\BCB\S. maltophilia Clinical B\F20)
+            '''
 
         # re-order 'data' part of frame for convenience
         # currently exists as a data frame with name columns
@@ -155,8 +213,6 @@ if __name__ == '__main__':
         # need to be able to manipulate data as numpy arrays
         # keep column headers around for later use
         df, used_column_headers = prepare_data_frame(df_raw)
-        end = time.time()
-        print 'Data loaded in %d seconds' % (end-start)
 
         print 'Creating labels...'
         label_dictionaries = create_labels_dictionaries()
@@ -175,7 +231,7 @@ if __name__ == '__main__':
             print y.groupby('classification').count()
 
         print 'Test/train split...'
-        X_train, X_test, y_train, y_test = split_train_test(X,y)
+        X_train, X_test, y_train, y_test = split_train_test(X,y, test_size=0.10)
 
         if verbose:
             print '\nTEST summary:'
@@ -198,8 +254,8 @@ if __name__ == '__main__':
         DI = sm.preprocess(X_test)
         if verbose:
             print DI.iloc[0][0:5, 0:4]
-        print 'DII, reftime = 1'
-        sm = SeriesModel(color_vector_type='DII', reference_time=1)
+        print 'DII, reftime = 3'
+        sm = SeriesModel(color_vector_type='DII', reference_time=3)
         DII = sm.preprocess(X_test)
         if verbose:
             print DII.iloc[0][0:5, 0:4]
@@ -221,7 +277,7 @@ if __name__ == '__main__':
             print sm.scores.head()
 
     print '1) Fit one timestep...'
-    if True:
+    if False:
         print 'A) Subset data'
         nt = 4
         X_sub = sm._subset_data(Z, nt)
@@ -232,6 +288,9 @@ if __name__ == '__main__':
             print X_sub.iloc[0][:,0:5]
 
         print 'B) Featurize data'
+        Xf, featurizer = sm._featurize_class(X_sub, 'poly', {'n':3})
+
+
         print 'i) Try all the same featurizer'
         Xd, Xg, Xc = sm._featurize(X_sub, nt)
 
@@ -254,17 +313,25 @@ if __name__ == '__main__':
     print 'C) Run detection model'
     nt = 30
     X_sub = sm._subset_data(Z, nt)
-    y_sub = sm._subset_data(y_test, nt)
+
     Xd, Xg, Xc = sm._featurize(X_sub, nt)
 
     print 'i) Convert featurized data to np array'
     np_Xd = sm._pandas_to_numpy(Xd)
-    print np_Xd.shape
-    print y_sub['detection'].values.shape
-    detection_model = sm._fit_class(Xd, y_train['detection'],
+    if True:
+        print np_Xd.shape
+        print y_test['detection'].values.shape
+
+    print 'ii) Train model'
+    detection_model = sm._fit_class(np_Xd, y_test['detection'].values,
                             'LR',
                             sm.detection_base_model_arguments,
                             step=('detection t=%d' % nt))
+
+    if verbose:
+        print 'Inspect stored models, featurizers'
+        print sm.models
+        print sm.featurizers
 
 
 
