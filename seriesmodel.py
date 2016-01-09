@@ -324,7 +324,9 @@ class SeriesModel(object):
         y_probabilities_classification = classification_model.predict_proba(np_X_classification)
 
         # score and write to predictions, probabilities, scores
-        self.score(number_of_times, y_predict_detection, y_predict_gram, y_predict_classification)
+        self._score_one_timestep(y_train, y_predict_detection,
+                                 y_predict_gram, y_predict_classification,
+                                 number_of_times)
 
     def _subset_data(self, Z, number_of_times):
         z_sub = Z.copy()
@@ -350,8 +352,11 @@ class SeriesModel(object):
         confusion = {}
         accuracy = {}
 
-    def _score_one_timestep(self):
-        pass
+    def _score_one_timestep(self, y_train, y_predict_detection,
+                             y_predict_gram, y_predict_classification,
+                             number_of_times):
+        score_dict = {}
+        score_dict['classification_confusion'] = confusion_matrix()
 
     def find_trial_lengths(self, X):
         trial_lengths = np.zeros(len(X))
