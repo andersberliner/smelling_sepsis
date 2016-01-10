@@ -249,31 +249,44 @@ if __name__ == '__main__':
         # NOTE: can get back all of the data via df.ix[] whatever the index is
         # in y_train, y_test, etc.
 
-    start = time.time()
-    sm = SeriesModel(
-        color_scale = 'RGB',
-        color_vector_type = 'DI',
-        reference_time = 9,
-        min_time = 3,
-        detection_model = 'LR',
-        detection_model_arguments = {'n_jobs':-1},
-        gram_model = 'LR',
-        gram_model_arguments = {'n_jobs':-1, 'multi_class':ovr},
-        classification_model = 'LR',
-        classification_model_arguments = {'n_jobs':-1, 'multi_class':ovr},
-        detection_featurizer = 'poly',
-        detection_featurizer_arguments = {'n':4},
-        gram_featurizer = 'detection',
-        classification_featurizer = 'detection'
-        )
+    if True:
+        start = time.time()
+        sm = SeriesModel(
+            color_scale = 'RGB',
+            color_vector_type = 'DI',
+            reference_time = 9,
+            min_time = 3,
+            detection_model = 'LR',
+            detection_model_arguments = {'n_jobs':-1},
+            gram_model = 'LR',
+            gram_model_arguments = {'n_jobs':-1, 'multi_class':'ovr'},
+            classification_model = 'LR',
+            classification_model_arguments = {'n_jobs':-1, 'multi_class':'ovr'},
+            detection_featurizer = 'poly',
+            detection_featurizer_arguments = {'n':4},
+            gram_featurizer = 'detection',
+            classification_featurizer = 'detection'
+            )
 
-    sm.fit(X_train,y_train, verbose=verbose)
+        sm.fit(X_train,y_train, verbose=verbose, debug=True)
 
-    end = time.time()
+        end = time.time()
 
-    print '\n\n>>Model fit in %d seconds<<' % (end-start)
+        print '\n\n>>Model fit (%d times, %d samples) in %d seconds (%d mins)<<' % (len(sm.times), len(y_train), (end-start), (end-start)/60.0)
+
+        # predict
+        start = time.time()
+        yd, yg, yc = sm.predict(X_test, verbose=True)
+        end = time.time()
+        print '\n\n>>Model predictions (%d times, %d samples) in %d seconds (%d mins)<<' % (len(sm.times), len(y_test), (end-start), (end-start)/60.0)
+
+        start = time.time()
+        results = sm.score(y_test, verbose=True)
+        end = time.time()
+        print '\n\n>>Model scores (%d times, %d samples) in %d seconds (%d mins)<<' % (len(sm.times), len(y_test), (end-start), (end-start)/60.0)
+
 
 
     ### Unittests ###
     if False:
-        sm_unit = run_unittests(X_test, y_test, verbose)
+        sm_unit = run_unittests(X_test, y_test, verbose=False)

@@ -172,7 +172,7 @@ def classification_report_ovr(yt, yp, labels, s1=11, s2=10):
 
 if __name__ == '__main__':
     # Multi-class classification
-    if False:
+    if True:
         # play around with these metrics - 10 each of 1, 2 and 3
         yt = [1,1,1,1,1,1,1,1,1,1,
               2,2,2,2,2,2,2,2,2,2,
@@ -204,7 +204,7 @@ if __name__ == '__main__':
             print confusion_matrix_ovr(*results[i,:])
 
     # Unit-tests for binary classification
-    if True:
+    if False:
         print '\n'*3
         print 'Now experiment on these metrics for two-class example'
 

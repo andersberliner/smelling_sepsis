@@ -25,7 +25,8 @@ def run_unittests(X_test, y_test, verbose=False):
         if verbose:
             print DII.iloc[0][0:5, 0:4]
 
-    Z = sm._prepare_data(X_test, y_test)
+    sm.confusion_labels = sm._build_confusion_labels(y_test)
+    Z = sm._prepare_data(X_test)
 
     if False:
         print 'B) Set-up results dataframes'
@@ -42,7 +43,29 @@ def run_unittests(X_test, y_test, verbose=False):
             print sm.scores
 
     print '1) Fit one timestep...'
+    sm._fit_one_timestep(Z, y_test, 10)
+
+    print 'Fit another'
+    sm._fit_one_timestep(Z, y_test, 20)
+
+    print 'And another'
     sm._fit_one_timestep(Z, y_test, 30)
+
+    print 'Predict these timesteps'
+    sm.times = [10,20,30]
+    yd,yg,yc = sm.predict(X_test)
+
+    print 'Score timesteps'
+    results = sm.score(y_test, verbose=True)
+
+    print 'Try again using the full workthrough'
+
+    sm = SeriesModel(reference_time=9, min_time=3)
+    sm.fit(X_test, y_test, verbose=True, debug=True)
+
+    yd, yg, yc = sm.predict(X_test.iloc[0:10])
+    results = sm.score(y_test.iloc[0:10])
+
 
     if verbose:
         print 'Check shape of results'
@@ -139,5 +162,3 @@ def run_unittests(X_test, y_test, verbose=False):
         STP = SpotTimePlot(y_test, used_column_headers)
         STP.plot_fits(DI, DI_pred)
     return sm
-
-    

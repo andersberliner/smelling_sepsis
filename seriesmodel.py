@@ -10,13 +10,14 @@ from itertools import izip
 from collections import defaultdict
 from featurizer import PolynomialFeaturizer
 import multiclassmetrics as mcm
+import time
 
 class SeriesModel(object):
     def __init__(self, X=None, y=None,
                     color_scale = 'RGB',
                     color_vector_type = 'DI',
                     reference_time = 0,
-                    max_time = 67, # this represents the minimum length of any of our trials
+                    max_time = 60, # 20 hrs max
                     min_time = 1, # time after ref_time to start fitting
                     use_last_timestep_results = False, # True for simple, False do to Bayesian approach
                     detection_model='LR',
@@ -57,6 +58,7 @@ class SeriesModel(object):
         self.models = defaultdict(dict)
         self.featurizers = defaultdict(dict)
         self.preprocessors = defaultdict(dict)
+        self.times = []
 
         # set base models and preprocessors
         self.detection_base_model = detection_model
@@ -84,9 +86,25 @@ class SeriesModel(object):
         self.classification_base_featurizer_arguments = classification_featurizer_arguments
 
     def __repr__(self):
-        pass
+        print self
 
-    def _build_results_dataframes(self, y):
+    def _build_confusion_labels(self, y):
+        # set confusion labels and their order
+        confusion_labels = {}
+        for col in y.columns:
+            groups = y[col].unique()
+            groups.sort()
+            confusion_labels[col] = groups
+
+        # change order of classification confusion matrix to put control first
+        a = list(confusion_labels['classification'])
+        b = [a.pop(a.index('Control'))]
+        b.extend(a)
+        confusion_labels['classification'] = np.array(b)
+
+        return confusion_labels
+
+    def _build_results_dataframes(self, number_of_trials):
         # self.predictions = y.copy()
         # self.probabilities = y.copy()
         #
@@ -100,17 +118,10 @@ class SeriesModel(object):
         # self.results: stores by time-step the prediction and probas at each time_step
         df_columns = ['time']
         for result_type in ['predictions', 'probabilities']:
-            for col in y.columns:
-                df_columns.append(col + '_' + result_type)
+            for k in self.confusion_labels.keys():
+                df_columns.append(k + '_' + result_type)
 
         self.results = pd.DataFrame(columns=df_columns)
-
-        # set conufion labels and their order
-        self.confusion_labels = {}
-        for col in y.columns:
-            groups = y[col].unique()
-            groups.sort()
-            self.confusion_labels[col] = groups
 
         # up-to-date predictions and probabilities, by result_type
         self.predictions = {}
@@ -118,16 +129,12 @@ class SeriesModel(object):
         for k, v in self.confusion_labels.iteritems():
             # predictions['detection'] is a n_samples X 1 array of most recent
             #   predictions
-            self.predictions[k] = np.zeros(len(y))
+            self.predictions[k] = np.zeros(number_of_trials)
             # probabilities['classification'] is a n_samples X n_classes of
             #   most recent probabilities of classification for each class
-            self.probabilities[k] = np.zeros((len(y), len(v)))
+            self.probabilities[k] = np.zeros((number_of_trials, len(v)))
 
-        # change order of classification confusion matrix to put control first
-        a = list(self.confusion_labels['classification'])
-        b = [a.pop(a.index('Control'))]
-        b.extend(a)
-        self.confusion_labels['classification'] = np.array(b)
+
 
         # for all of our metrics, build a pandas dataframe column
         self.scores = {}
@@ -145,18 +152,19 @@ class SeriesModel(object):
                 self.scores[label]['micro'] = pd.DataFrame(columns=df_columns)
                 self.scores[label]['macro'] = pd.DataFrame(columns=df_columns)
 
-    def _prepare_data(self, X, y):
+    def _prepare_data(self, X):
         Z = self.preprocess(X.copy())
 
-        self._build_results_dataframes(y)
+        self._build_results_dataframes(len(Z))
         self.trial_lengths = self.find_trial_lengths(Z)
         self.inspect_trial_shapes(Z)
 
         return Z
 
-    def fit(self, X, y, verbose=False):
+    def fit(self, X, y, verbose=False, debug=False):
         self.verbose = verbose
-        X = self._prepare_data(X,y)
+        self.confusion_labels = self._build_confusion_labels(y)
+        X = self._prepare_data(X)
 
         if self.max_time > self.trial_lengths.min():
             print '***FIT ERROR***'
@@ -167,7 +175,13 @@ class SeriesModel(object):
         t = self.reference_time + self.min_time
         # don't use results for the first model made
         use_last_timestep_results = False
-        while t < self.max_time:
+        if debug:
+            self.times = [10,20,30,40,50,60]
+        else:
+            self.times = np.arange(t, self.max_time, 1)
+        for t in self.times:
+            start = time.time()
+
             if self.verbose:
                 print '\n\n TIMESTEP %d...' % t
             self._fit_one_timestep(X, y, t, use_last_timestep_results)
@@ -176,7 +190,13 @@ class SeriesModel(object):
             # Bayes update
             if not self.use_last_timestep_results:
                 self.bayes_update(t)
-            t += 1
+
+            end = time.time()
+            if self.verbose:
+                print '\n TIMESTEP %d took %d seconds' % (t, (end-start))
+
+
+
 
     def bayes_update(self,t):
         # use Bayesian prior/posterior ideas to update predictions, probabilities
@@ -245,6 +265,14 @@ class SeriesModel(object):
         # need to flatten the features
         X_flat = X_features.apply(lambda x: x.flatten())
         return X_features, featurizer
+
+    def _predict_featurize_class(self, X, featurizer):
+        X_features, scores = featurizer.fit_transform(X)
+        # print X_features.head()
+
+        # need to flatten the features
+        X_flat = X_features.apply(lambda x: x.flatten())
+        return X_features
 
     # def _featurize_gram(self, X_train):
     #     # featurizer = PolynomialFeaturizer()
@@ -431,22 +459,151 @@ class SeriesModel(object):
     def _featurize_classification(self, X_train):
         pass
 
+    def predict_proba(self, X, verbose=False):
+        yd, yg, yc = self.predict(X, verbose)
+
+        return self.probabilities['detection'], self.probabilities['gram'], self.probabilities['classification']
+
+
     def predict(self, X, verbose=False):
         self.verbose = verbose
-        X = self.preprocess(X.copy())
+
+        # preprocesses X via manner used to fit
+        # also creates scores, results, predictions and probabilities df
+        # NOTE: this overwrites the existing df created during the fit step
+        X = self._prepare_data(X)
 
         if self.max_time > self.trial_lengths.min():
             print '***FIT ERROR***'
             print 'Minimum trial_length, %s, is less than max_time, %s' % (self.trial_lengths.min(), self.max_time)
             return
 
+        # step thru timesteps, featurizers, preprocessors, models and predicts
+        use_last_timestep_results = False
+        for t in self.times:
+            start = time.time()
 
-    def _predict_one_timestep(self, X, number_of_times):
-        pass
+            self._predict_one_timestep(X,t,use_last_timestep_results)
+            use_last_timestep_results = self.use_last_timestep_results
 
-    def score(self, number_of_times, y_predict_detection, y_predict_gram, y_predict_classification):
-        confusion = {}
-        accuracy = {}
+            # Bayes update
+            if not self.use_last_timestep_results:
+                self.bayes_update(t)
+
+            end = time.time()
+            if self.verbose:
+                print '\n PREDICT TIMESTEP %d took %d seconds' % (t, (end-start))
+
+        return self.predictions['detection'], self.predictions['gram'], self.predictions['classification']
+
+
+    def _predict_one_timestep(self, X, number_of_times, use_last_timestep_results=False):
+        # subset the data
+        X = self._subset_data(X, number_of_times)
+
+        # featurize
+        X_detection, X_gram, X_classification = self._predict_featurize(X, number_of_times)
+
+        # predict detection
+        print 'Predicting detection nt=%d ...' % number_of_times
+        np_X_detection = self._pandas_to_numpy(X_detection)
+
+        # use last timestep if required
+        if use_last_timestep_results:
+            # append most recent probabilities of growth (col 1)
+            np_X_detection = np.hstack((np_X_detection,
+                                        self.probabilities['detection'][:,1].reshape(-1,1)))
+
+        # predict detection
+        detection_model = self.models['detection'][number_of_times]
+        y_predict_detection = detection_model.predict(np_X_detection)
+        y_probabilities_detection = detection_model.predict_proba(np_X_detection)
+
+        # predict gram
+        print 'Predicting gram nt=%d ...' % number_of_times
+        np_X_gram = self._pandas_to_numpy(X_gram)
+        np_X_gram = np.hstack((np_X_gram, y_probabilities_detection[:,1].reshape(-1,1)))
+
+        if use_last_timestep_results:
+            # append probas of n, p (not control)
+            np_X_gram = np.hstack((np_X_gram, self.probabilities['gram'][:,:2]))
+
+        gram_model = self.models['gram'][number_of_times]
+        y_predict_gram = gram_model.predict(np_X_gram)
+        y_probabilities_gram = gram_model.predict_proba(np_X_gram)
+
+        # fit classification
+        print 'Training classification nt=%d ...' % number_of_times
+        np_X_classification = self._pandas_to_numpy(X_classification)
+        np_X_classification = np.hstack((np_X_classification,
+                            y_probabilities_detection[:,1].reshape(-1,1),
+                            y_probabilities_gram[:,:-1]))
+        if use_last_timestep_results:
+            np_X_classification = np.hstack((np_X_classification,
+                                        self.probabilities['classification'][:,:-1]))
+
+        classification_model = self.models['classification'][number_of_times]
+
+        y_predict_classification = classification_model.predict(np_X_classification)
+        y_probabilities_classification = classification_model.predict_proba(np_X_classification)
+
+        # store results from this timestep
+        self._store_one_timestep((y_predict_detection, y_probabilities_detection),
+                                 (y_predict_gram, y_probabilities_gram),
+                                 (y_predict_classification, y_probabilities_classification),
+                                 number_of_times)
+
+
+    def _predict_featurize(self, X, number_of_times):
+        detection_featurizer = self.featurizers['detection'][number_of_times]
+        X_detection = self._predict_featurize_class(X, detection_featurizer)
+
+        if self.gram_base_featurizer == 'detection':
+            X_gram = X_detection.copy()
+        else:
+            gram_featurizer = self.featurizers['gram'][number_of_times]
+            X_gram = self._predict_featurize_class(X, gram_featurizer)
+
+        if self.classification_base_featurizer == 'detection':
+            X_classification = X_detection.copy()
+        elif self.classification_base_featurizer == 'gram':
+            X_classification = X_gram.copy()
+        else:
+            classification_featurizer = self.featurizers['classification'][number_of_times]
+            X_classification = self._predict_featurize_class(X, classification_featurizer)
+
+        return X_detection, X_gram, X_classification
+
+
+
+    def _get_column_value_by_time(self, df, column, time):
+        return df[df['time']==time][column].values[0]
+
+    def score(self, y, verbose=False):
+        # NOTE - scores at each time-step
+        # must follow a fit or predict step
+        self.verbose = verbose
+
+        for t in self.times:
+            y_predict_detection = self._get_column_value_by_time(self.results, 'detection_predictions', t)
+            y_predict_gram = self._get_column_value_by_time(self.results, 'gram_predictions', t)
+            y_predict_classification = self._get_column_value_by_time(self.results, 'classification_predictions', t)
+
+            y_probabilities_detection = self._get_column_value_by_time(self.results, 'detection_probabilities', t)
+            y_probabilities_gram = self._get_column_value_by_time(self.results, 'gram_probabilities', t)
+            y_probabilities_classification = self._get_column_value_by_time(self.results, 'classification_probabilities', t)
+
+            # score and write to scores
+            self._score_one_timestep(y, y_predict_detection,
+                                     y_predict_gram, y_predict_classification,
+                                     t)
+
+            # store results from this timestep
+            self._store_one_timestep((y_predict_detection, y_probabilities_detection),
+                                     (y_predict_gram, y_probabilities_gram),
+                                     (y_predict_classification, y_probabilities_classification),
+                                     t)
+        return self.results
 
     def _populate_score_dict(self, cm, results, number_of_times):
         score_dict = {}
@@ -488,8 +645,17 @@ class SeriesModel(object):
         # detection - calculate results
         if self.verbose:
             print 'Detection results'
-            print mcm.classification_report_ovr(y_train['detection'], y_predict_detection, [0,1])
-
+            print mcm.classification_report_ovr(y_train['detection'],
+                y_predict_detection,
+                self.confusion_labels['detection'])
+            print 'Gram results'
+            print mcm.classification_report_ovr(y_train['gram'],
+                y_predict_gram,
+                self.confusion_labels['gram'])
+            print 'Classification results'
+            print mcm.classification_report_ovr(y_train['classification'],
+                y_predict_classification,
+                self.confusion_labels['classification'], s1=30)
 
         scores = mcm.scores_binary(y_train['detection'], y_predict_detection)
         # print scores
