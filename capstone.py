@@ -82,7 +82,7 @@ def populate_columns_to_drop(other_spots = [], colors=['R', 'G', 'B']):
 
     return columns_to_drop
 
-def create_labels_dictionaries(species_info_filename = 'species_to_gram.csv'):
+def create_labels_dictionaries(species_info_filename = 'species_to_gram2.csv'):
     label_df = pd.read_csv(species_info_filename, index_col=0)
 
     # label_dictionaries = {{column_name: label_df[column_name].to_dict()} for column_name in label_df.columns}
@@ -96,10 +96,9 @@ def create_labels(df, label_dictionaries):
     df['label'] = df['Genus'] + '_' + df['Species']
     df['label'] = df['label'].apply(lambda x: 'Control' if x == 'control_control' else x)
 
-    # make dictionaries for population of gram
-    ignore_dict, detection_dict, gram_dict, label_dict = label_dictionaries
-
     for k, v in label_dictionaries.iteritems():
+        if k in ['url', 'pic']: # use these for display purposes
+            pass
         df[k] = df['label'].apply(lambda x: v[x])
 
     return df
@@ -155,7 +154,7 @@ def find_data_anomalies(df, Imax=4096.0, Imin=0.0):
 
 if __name__ == '__main__':
     verbose = False
-
+    quickload = True
     if True:
         root_folder = 'Shared Sepsis Data'
         csv_filename = os.path.join(root_folder, 'Sepsis_JCM.csv')
@@ -186,7 +185,7 @@ if __name__ == '__main__':
             print 'Finding anomalous trials...'
             an_df = find_data_anomalies(df_raw)
             end = time.time()
-            print 'Anomalous trial found in %d seconds (%d trials):' % ((end-start), len(an_df))
+            print 'Anomalous trials found in %d seconds (%d trials):' % ((end-start), len(an_df))
             print an_df
 
             '''
@@ -244,9 +243,9 @@ if __name__ == '__main__':
 
     print 'Do some unit tests on seriesmodel, featurizer...'
     print '0) Set-up (prepare data)'
-    sm = SeriesModel(reference_time=2)
+    sm = SeriesModel(reference_time=9)
 
-    if True:
+    if False:
         print 'A) seriesmodel preprocessing'
         if verbose:
             print X_test.iloc[0][0:5, 0:4]
@@ -262,7 +261,7 @@ if __name__ == '__main__':
 
     Z = sm._prepare_data(X_test, y_test)
 
-    if True:
+    if False:
         print 'B) Set-up results dataframes'
         if verbose:
             print 'Predictions'
@@ -274,9 +273,11 @@ if __name__ == '__main__':
             print 'Confusion Labels'
             print sm.confusion_labels
             print 'Scores'
-            print sm.scores.head()
+            print sm.scores
 
     print '1) Fit one timestep...'
+    sm._fit_one_timestep(Z, y_test, 30)
+
     if False:
         print 'A) Subset data'
         nt = 4
@@ -310,28 +311,28 @@ if __name__ == '__main__':
             print Xg2.head()
             print Xc2.head()
 
-    print 'C) Run detection model'
-    nt = 30
-    X_sub = sm._subset_data(Z, nt)
+        print 'C) Run detection model'
+        nt = 30
+        X_sub = sm._subset_data(Z, nt)
 
-    Xd, Xg, Xc = sm._featurize(X_sub, nt)
+        Xd, Xg, Xc = sm._featurize(X_sub, nt)
 
-    print 'i) Convert featurized data to np array'
-    np_Xd = sm._pandas_to_numpy(Xd)
-    if True:
-        print np_Xd.shape
-        print y_test['detection'].values.shape
+        print 'i) Convert featurized data to np array'
+        np_Xd = sm._pandas_to_numpy(Xd)
+        if verbose:
+            print np_Xd.shape
+            print y_test['detection'].values.shape
 
-    print 'ii) Train model'
-    detection_model = sm._fit_class(np_Xd, y_test['detection'].values,
-                            'LR',
-                            sm.detection_base_model_arguments,
-                            step=('detection t=%d' % nt))
+        print 'ii) Train model'
+        detection_model = sm._fit_class(np_Xd, y_test['detection'].values,
+                                'LR',
+                                sm.detection_base_model_arguments,
+                                step=('detection t=%d' % nt))
 
-    if verbose:
-        print 'Inspect stored models, featurizers'
-        print sm.models
-        print sm.featurizers
+        if verbose:
+            print 'Inspect stored models, featurizers'
+            print sm.models
+            print sm.featurizers
 
 
 
