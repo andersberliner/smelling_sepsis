@@ -16,6 +16,9 @@ class SeriesModel(object):
                     color_scale = 'RGB',
                     color_vector_type = 'DI',
                     reference_time = 0,
+                    max_time = 67, # this represents the minimum length of any of our trials
+                    min_time = 1, # time after ref_time to start fitting
+                    use_last_timestep_results = False, # True for simple, False do to Bayesian approach
                     detection_model='LR',
                     detection_model_arguments={},
                     detection_preprocessor='pca',
@@ -40,6 +43,10 @@ class SeriesModel(object):
         self.color_scale = color_scale
         self.color_vector_type = color_vector_type
         self.reference_time = reference_time
+        self.max_time = max_time
+        self.min_time = min_time
+
+        self.use_last_timestep_results = use_last_timestep_results
 
         self.verbose = False
         self.trial_lengths = None
@@ -80,18 +87,41 @@ class SeriesModel(object):
         pass
 
     def _build_results_dataframes(self, y):
-        self.predictions = y.copy()
-        self.probabilities = y.copy()
+        # self.predictions = y.copy()
+        # self.probabilities = y.copy()
+        #
+        # # this stores by trial for ease of looking at single trials
+        # for col in y.columns:
+        #     self.predictions[col] = self.predictions[col].apply(lambda x: [])
+        #     self.probabilities[col] = self.probabilities[col].apply(lambda x: [])
 
-        for col in y.columns:
-            self.predictions[col] = self.predictions[col].apply(lambda x: [])
-            self.probabilities[col] = self.probabilities[col].apply(lambda x: [])
 
+
+        # self.results: stores by time-step the prediction and probas at each time_step
+        df_columns = ['time']
+        for result_type in ['predictions', 'probabilities']:
+            for col in y.columns:
+                df_columns.append(col + '_' + result_type)
+
+        self.results = pd.DataFrame(columns=df_columns)
+
+        # set conufion labels and their order
         self.confusion_labels = {}
         for col in y.columns:
             groups = y[col].unique()
             groups.sort()
             self.confusion_labels[col] = groups
+
+        # up-to-date predictions and probabilities, by result_type
+        self.predictions = {}
+        self.probabilities = {}
+        for k, v in self.confusion_labels.iteritems():
+            # predictions['detection'] is a n_samples X 1 array of most recent
+            #   predictions
+            self.predictions[k] = np.zeros(len(y))
+            # probabilities['classification'] is a n_samples X n_classes of
+            #   most recent probabilities of classification for each class
+            self.probabilities[k] = np.zeros((len(y), len(v)))
 
         # change order of classification confusion matrix to put control first
         a = list(self.confusion_labels['classification'])
@@ -128,11 +158,30 @@ class SeriesModel(object):
         self.verbose = verbose
         X = self._prepare_data(X,y)
 
+        if self.max_time > self.trial_lengths.min():
+            print '***FIT ERROR***'
+            print 'Minimum trial_length, %s, is less than max_time, %s' % (self.trial_lengths.min(), self.max_time)
+            return
+
         # start with the second time
-        t = 1
-        while t < self.trial_lengths.max():
-            self._fit_one_timestep(X, y, t)
+        t = self.reference_time + self.min_time
+        # don't use results for the first model made
+        use_last_timestep_results = False
+        while t < self.max_time:
+            if self.verbose:
+                print '\n\n TIMESTEP %d...' % t
+            self._fit_one_timestep(X, y, t, use_last_timestep_results)
+            use_last_timestep_results = self.use_last_timestep_results
+
+            # Bayes update
+            if not self.use_last_timestep_results:
+                self.bayes_update(t)
             t += 1
+
+    def bayes_update(self,t):
+        # use Bayesian prior/posterior ideas to update predictions, probabilities
+        # based on most recent timestep
+        pass
 
     def preprocess(self, X):
         reference_time = self.reference_time
@@ -276,13 +325,17 @@ class SeriesModel(object):
 
         return np_X
 
-    def _fit_one_timestep(self, X, y, number_of_times):
+    def _fit_one_timestep(self, X, y, number_of_times, use_last_timestep_results=False):
         # subset the data
         X_train = self._subset_data(X, number_of_times)
 
         # featurize
         X_detection, X_gram, X_classification = self._featurize(X_train, number_of_times)
         np_X_detection = self._pandas_to_numpy(X_detection)
+        if use_last_timestep_results:
+            # append most recent probabilities of growth (col 1)
+            np_X_detection = np.hstack((np_X_detection,
+                                        self.probabilities['detection'][:,1].reshape(-1,1)))
         # fit detection
         print 'Training detection nt=%d ...' % number_of_times
         # detection_model = self.fit_detection(X_detection, y['detection'])
@@ -313,6 +366,9 @@ class SeriesModel(object):
         # print y_probabilities_detection.shape
         # print y_probabilities_detection[:,1].shape
         np_X_gram = np.hstack((np_X_gram, y_probabilities_detection[:,1].reshape(-1,1)))
+        if use_last_timestep_results:
+            # append probas of n, p (not control)
+            np_X_gram = np.hstack((np_X_gram, self.probabilities['gram'][:,:2]))
         gram_model = self._fit_class(np_X_gram,
                                 y['gram'].values,
                                 self.gram_base_model,
@@ -335,7 +391,10 @@ class SeriesModel(object):
         # print y_probabilities_gram[:,:2].shape
         np_X_classification = np.hstack((np_X_classification,
                             y_probabilities_detection[:,1].reshape(-1,1),
-                            y_probabilities_gram[:,:2]))
+                            y_probabilities_gram[:,:-1]))
+        if use_last_timestep_results:
+            np_X_classification = np.hstack((np_X_classification,
+                                        self.probabilities['classification'][:,:-1]))
         # classification_model = self.fit_classification(np_X_classification, y['classification'])
         classification_model = self._fit_class(np_X_classification, y['classification'],
                                 self.classification_base_model,
@@ -348,9 +407,14 @@ class SeriesModel(object):
         y_predict_classification = classification_model.predict(np_X_classification)
         y_probabilities_classification = classification_model.predict_proba(np_X_classification)
 
-        # score and write to predictions, probabilities, scores
+        # score and write to scores
         self._score_one_timestep(y, y_predict_detection,
                                  y_predict_gram, y_predict_classification,
+                                 number_of_times)
+        # store results from this timestep
+        self._store_one_timestep((y_predict_detection, y_probabilities_detection),
+                                 (y_predict_gram, y_probabilities_gram),
+                                 (y_predict_classification, y_probabilities_classification),
                                  number_of_times)
 
     def _subset_data(self, Z, number_of_times):
@@ -367,8 +431,15 @@ class SeriesModel(object):
     def _featurize_classification(self, X_train):
         pass
 
-    def predict(self, X):
-        pass
+    def predict(self, X, verbose=False):
+        self.verbose = verbose
+        X = self.preprocess(X.copy())
+
+        if self.max_time > self.trial_lengths.min():
+            print '***FIT ERROR***'
+            print 'Minimum trial_length, %s, is less than max_time, %s' % (self.trial_lengths.min(), self.max_time)
+            return
+
 
     def _predict_one_timestep(self, X, number_of_times):
         pass
@@ -391,6 +462,26 @@ class SeriesModel(object):
     def _append_row_to_df(self, df, row):
         df.loc[len(df)+1] = row
 
+    def _store_one_timestep(self, detection_tuple, gram_tuple, classification_tuple, number_of_times):
+        results_dict = {}
+        results_dict['time'] = number_of_times
+
+        # update results data_frame
+        results_tuples = [detection_tuple, gram_tuple, classification_tuple]
+        results_types = ['detection', 'gram', 'classification']
+        for (predictions, probabilities), results_type in izip(results_tuples, results_types):
+            results_dict[results_type + '_' + 'predictions'] = predictions
+            results_dict[results_type + '_' + 'probabilities'] = probabilities
+
+        self._append_row_to_df(self.results, results_dict)
+
+        # update predictions and probabilities
+        results_tuples = [detection_tuple, gram_tuple, classification_tuple]
+        results_types = ['detection', 'gram', 'classification']
+        for (predictions, probabilities), results_type in izip(results_tuples, results_types):
+            self.predictions[results_type] = predictions
+            self.probabilities[results_type] = probabilities
+
     def _score_one_timestep(self, y_train, y_predict_detection,
                              y_predict_gram, y_predict_classification,
                              number_of_times):
@@ -401,10 +492,10 @@ class SeriesModel(object):
 
 
         scores = mcm.scores_binary(y_train['detection'], y_predict_detection)
-        print scores
+        # print scores
         # builds confusion matrix of TP, FP, etc. for the detection case
         cm = mcm.confusion_matrix_binary(y_train['detection'], y_predict_detection)
-        print cm
+        # print cm
         # detection - populate scores
         score_dict = self._populate_score_dict(cm, scores, number_of_times)
         # self.scores['detection'] = self.scores['detection'].append(score_dict, ignore_index=True)
@@ -416,12 +507,12 @@ class SeriesModel(object):
             cm = mcm.confusion_matrix_mc(y_train[result_type], predictions, labels)
             results = mcm.results_ovr(y_train[result_type], predictions, labels)
             scores = mcm.scores_ovr(y_train[result_type], predictions, labels)
-            micros, macros = mcm.micro_macro_results(results)
+            micros, macros = mcm.micro_macro_scores(results)
 
             # add results for each label
             for i, label in enumerate(labels):
                 label_cm = mcm.confusion_matrix_ovr(*results[i,:])
-                score_dict = self._populate_score_dict(cm, results[i,:], number_of_times)
+                score_dict = self._populate_score_dict(label_cm, scores[i,:], number_of_times)
                 # self.scores[result_type][label].append(score_dict, ignore_index=True)
                 self._append_row_to_df(self.scores[result_type][label], score_dict)
 

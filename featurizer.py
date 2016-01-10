@@ -34,7 +34,7 @@ class PolynomialFeaturizer(object):
         poly = PolynomialFeatures(degree=self.n)
 
         # can use Ridge or Lasso here => gridsearch
-        model = LinearRegression(fit_intercept=False)
+        model = LinearRegression(fit_intercept=False, n_jobs=-1)
 
         coef_, scores_ = self._regress(X, model, poly)
         return coef_, scores_

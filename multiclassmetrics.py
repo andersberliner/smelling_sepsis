@@ -22,7 +22,7 @@ def macro_average(func, results):
         total += func(*row)
     return total/float(len(results))
 
-def micro_macro_results(results):
+def micro_macro_scores(results):
     macros = [macro_average(accuracy_ovr, results),
               macro_average(precision_ovr, results),
               macro_average(recall_ovr, results),
@@ -116,7 +116,7 @@ def scores_binary(yt,yp,labels=[0,1]):
 def classification_report_ovr(yt, yp, labels, s1=11, s2=10):
     results = results_ovr(yt,yp,labels)
     scores = scores_ovr(yt,yp,labels)
-    micros, macros = micro_macro_results(results)
+    micros, macros = micro_macro_scores(results)
 
     report = '%s %s %s %s %s %s' % (' '.rjust(s1),
                                     'precision'.rjust(s2),
