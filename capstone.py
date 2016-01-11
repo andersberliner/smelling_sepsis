@@ -292,7 +292,7 @@ if __name__ == '__main__':
             classification_featurizer = 'detection'
             )
 
-        sm.fit(X_train,y_train, verbose=verbose, debug=True)
+        sm.fit(X_train,y_train, verbose=verbose, debug=False)
 
         end = time.time()
 
