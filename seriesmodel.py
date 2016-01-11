@@ -85,8 +85,8 @@ class SeriesModel(object):
         self.classification_base_preprocessor_arguments = classification_preprocessor_arguments
         self.classification_base_featurizer_arguments = classification_featurizer_arguments
 
-    def __repr__(self):
-        print self
+    # def __repr__(self):
+    #     print self
 
     def _build_confusion_labels(self, y):
         # set confusion labels and their order
@@ -176,7 +176,7 @@ class SeriesModel(object):
         # don't use results for the first model made
         use_last_timestep_results = False
         if debug:
-            self.times = [10,20,30,40,50,60]
+            self.times = [30,40,50]
         else:
             self.times = np.arange(t, self.max_time, 1)
         for t in self.times:
@@ -192,7 +192,7 @@ class SeriesModel(object):
                 self.bayes_update(t)
 
             end = time.time()
-            if self.verbose:
+            if True:
                 print '\n TIMESTEP %d took %d seconds' % (t, (end-start))
 
 
@@ -249,6 +249,8 @@ class SeriesModel(object):
             return X_features
 
         if featurizer_type == 'poly':
+            featurizer_arguments['reference_time'] = self.reference_time
+            # featurizer_arguments['verbose'] = self.verbose
             featurizer = PolynomialFeaturizer(**featurizer_arguments)
         elif featurizer_type == 'kink':
             pass
@@ -358,6 +360,7 @@ class SeriesModel(object):
         X_train = self._subset_data(X, number_of_times)
 
         # featurize
+        print 'Featurizing nt=%d ...' % number_of_times
         X_detection, X_gram, X_classification = self._featurize(X_train, number_of_times)
         np_X_detection = self._pandas_to_numpy(X_detection)
         if use_last_timestep_results:

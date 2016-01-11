@@ -1,0 +1,46 @@
+# RUN PROFILER for speed and size
+# storing 3 featurizers, 3 models at each timestep
+# storing results (predictions, probabilties) at each timestep
+
+
+>>Model fit (6 times, 863 samples) in 483 seconds (8 mins)<<
+
+Regressed 863 trials, n=4 in 67 seconds
+
+>>Model predictions (6 times, 215 samples) in 101 seconds (1 mins)<<
+
+Regressed 215 trials, n=4 in 17 seconds
+
+
+>>Model scores (6 times, 215 samples) in 0 seconds (0 mins)<<
+
+Look at size of seriesmodel object
+231304
+N/A size=238856 flat=64
+    __dict__ size=238792 flat=3352
+    __class__ size=0 flat=0
+Look at memory leaks up to this point
+                                       types |   # objects |   total size
+============================================ | =========== | ============
+                               numpy.ndarray |        7263 |    224.37 MB
+                                        list |       20405 |      2.04 MB
+                                        dict |        3772 |      1.31 MB
+                                         str |       15737 |    943.91 KB
+                   pandas.lib.BlockPlacement |        2369 |    203.59 KB
+                                         int |        8573 |    200.93 KB
+                                       tuple |        2465 |    162.38 KB
+  <class 'pandas.core.internals.BlockManager |        1228 |    153.50 KB
+                         function (<lambda>) |        1228 |    143.91 KB
+                   pandas.index.ObjectEngine |        1225 |    124.41 KB
+      <class 'pandas.core.internals.IntBlock |        1203 |    103.38 KB
+    <class 'pandas.core.internals.FloatBlock |        1130 |     97.11 KB
+                                       slice |        2364 |     92.34 KB
+        <class 'pandas.core.index.Int64Index |        1229 |     76.81 KB
+         <class 'pandas.core.frame.DataFrame |        1228 |     76.75 KB
+Look at how the SeriesModel class is doing
+---- SUMMARY ------------------------------------------------------------------
+                                         active      0     B      average   pct
+  seriesmodel.SeriesModel                     0      0     B      0     B    0%
+                                         active      0     B      average   pct
+  seriesmodel.SeriesModel                     1    242.48 KB    242.48 KB    0%
+-------------------------------------------------------------------------------

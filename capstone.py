@@ -19,6 +19,11 @@ from timeseriesplotter import SpotTimePlot
 from collections import defaultdict
 from unittests import run_unittests
 
+from sklearn.linear_model import LogisticRegression
+
+# use pympler to do memory diagnosis
+from pympler import asizeof, tracker, classtracker
+
 def timestamp_interpretter(x):
     # TODO - fix regex for timestamps of the type:
     #   2012-Apr-17_23-42-03
@@ -233,8 +238,27 @@ def load_data(root_foler, csv_filename, verbose=False):
     return X, y, used_column_headers, df, df_raw
 
 if __name__ == '__main__':
-    verbose = True
+    verbose = False
     quickload = True
+    profile = True
+
+    if profile:
+        # set-up some tracking statements from pympler
+        tr = tracker.SummaryTracker()
+        tr_sm = classtracker.ClassTracker()
+        # tr_pf = classtracker.ClassTracker()
+        # tr_stp = classtracker.ClassTracker()
+        # tr_lr = classtracker.ClassTracker()
+
+        tr_sm.track_class(SeriesModel)
+        # tr_pf.track_class(PolynomialFeaturizer)
+        # tr_stp.track_class(SpotTimePlot)
+        # tr_lr.track_class(LogisticRegression)
+
+        tr_sm.create_snapshot()
+        # tr_pf.create_snapshot()
+        # tr_stp.create_snapshot()
+        # tr_lr.create_snapshot()
 
     # data loading
     if True:
@@ -272,20 +296,66 @@ if __name__ == '__main__':
 
         end = time.time()
 
-        print '\n\n>>Model fit (%d times, %d samples) in %d seconds (%d mins)<<' % (len(sm.times), len(y_train), (end-start), (end-start)/60.0)
+        print '\n\n>>Model fit (%d times, %d samples) in %d seconds (%d mins)<<\n\n' % (len(sm.times), len(y_train), (end-start), (end-start)/60.0)
 
         # predict
         start = time.time()
-        yd, yg, yc = sm.predict(X_test, verbose=True)
+        yd, yg, yc = sm.predict(X_test, verbose=verbose)
         end = time.time()
-        print '\n\n>>Model predictions (%d times, %d samples) in %d seconds (%d mins)<<' % (len(sm.times), len(y_test), (end-start), (end-start)/60.0)
+        print '\n\n>>Model predictions (%d times, %d samples) in %d seconds (%d mins)<<\n\n' % (len(sm.times), len(y_test), (end-start), (end-start)/60.0)
 
         start = time.time()
-        results = sm.score(y_test, verbose=True)
+        results = sm.score(y_test, verbose=verbose)
         end = time.time()
-        print '\n\n>>Model scores (%d times, %d samples) in %d seconds (%d mins)<<' % (len(sm.times), len(y_test), (end-start), (end-start)/60.0)
+        print '\n\n>>Model scores (%d times, %d samples) in %d seconds (%d mins)<<\n\n' % (len(sm.times), len(y_test), (end-start), (end-start)/60.0)
 
 
+        if profile:
+            print '\nSERIESMODEL profiling'
+            print 'Look at size of seriesmodel object'
+            print asizeof.asizeof(sm)
+            print asizeof.asized(sm, detail=1).format()
+
+            print 'Look at how the SeriesModel class is doing'
+            tr_sm.create_snapshot()
+            tr_sm.stats.print_summary()
+
+            # print '\nPOLYNOMIALFEATURIZER profiling'
+            # print 'Size of PF object'
+            # print asizeof.asizeof(sm.featurizers['gram'][50])
+            # print asizeof.asized(sm.featurizers['gram'][50], detail=1).format()
+            # print 'Look at how the PolynomialFeaturizer class is doing'
+            # tr_pf.create_snapshot()
+            # tr_pf.stats.print_summary()
+            #
+            # print '\nSPOTTIMEPLOT profiling'
+            # print 'Size of a STP object'
+            # DI = sm.preprocess(X_test)
+            # PF = PolynomialFeaturizer(n=4, reference_time=2, verbose=True)
+            # mycoefs, myscores = PF.fit_transform(DI)
+            # # myscores = PF.score()
+            # DI_pred = PF.predict(DI, mycoefs)
+            # STP = SpotTimePlot(y_test, used_column_headers)
+            # STP.plot_fits(DI, DI_pred)
+            # print asizeof.asizeof(STP)
+            # print asizeof.asized(STP, detail=1).format()
+            #
+            # print 'Look at how stp is doing'
+            # tr_stp.create_snapshot()
+            # tr_stp.stats.print_summary()
+            #
+            # print '\nLR profiling'
+            # print 'Sizer of an LR object'
+            # print asizeof.asizeof(sm.models['classification'][50])
+            # print asizeof.asized(sm.models['classification'][50], detail=1).format()
+            #
+            # print 'Look at how LR is doing'
+            # tr_lr.create_snapshot()
+            # tr_lr.stats.print_summary()
+
+            print 'PROFILING'
+            print 'Look at memory leaks up to this point'
+            tr.print_diff()
 
     ### Unittests ###
     if False:

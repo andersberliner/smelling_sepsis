@@ -9,7 +9,7 @@ from itertools import izip
 import time
 
 class PolynomialFeaturizer(object):
-    def __init__(self, n=4, reference_time=0, verbose=False):
+    def __init__(self, n=4, reference_time=0, verbose=True):
         self.n = n
         self.reference_time = reference_time
         self.verbose = verbose
@@ -82,7 +82,8 @@ class PolynomialFeaturizer(object):
         scores_ = X.apply(lambda x: np.zeros(number_of_spots))
         for trial_index, x in enumerate(X):
             if trial_index % 100 == 0:
-                print 'Featurizing trial ', trial_index
+                if self.verbose:
+                    print 'Featurizing trial ', trial_index
             # regress coefficients are (poly order +1 )x(n_spots)
             coefficients = np.zeros(((self.n+1), number_of_spots))
             scores = np.zeros(number_of_spots)
