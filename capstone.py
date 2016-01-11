@@ -22,6 +22,7 @@ import multiprocessing
 from utils_capstone import print_to_file_and_terminal as ptf
 
 from sklearn.linear_model import LogisticRegression
+import pickle
 
 # use pympler to do memory diagnosis
 from pympler import asizeof, tracker, classtracker
@@ -245,13 +246,16 @@ def load_data(root_foler, csv_filename, verbose=False):
     return X, y, used_column_headers, df, df_raw
 
 if __name__ == '__main__':
+    # Run conditions
     verbose = True
     quickload = True
     profile = False
     debug = True
 
     n_cpus = multiprocessing.cpu_count()
+    # model conditions
     n_jobs = 1
+    use_last_timestep_results = False
 
 
     ptf('====> Starting job ID: %s <====' % START_DT_STR, LOGFILE)
@@ -259,6 +263,7 @@ if __name__ == '__main__':
     ptf('\tdebug: %s' % debug, LOGFILE)
     ptf('\tprofile: %s' % profile, LOGFILE)
     ptf('\tverbose: %s' % verbose, LOGFILE)
+    ptf('\tuse_last_timestep_results: %s' % use_last_timestep_results, LOGFILE)
 
     if profile:
         # set-up some tracking statements from pympler
@@ -295,6 +300,7 @@ if __name__ == '__main__':
         start = time.time()
         sm = SeriesModel(
             logfile = LOGFILE,
+            use_last_timestep_results = use_last_timestep_results,
             color_scale = 'RGB',
             color_vector_type = 'DI',
             reference_time = 9,
@@ -319,9 +325,10 @@ if __name__ == '__main__':
 
         # Pickle model
         train_file_name = 'sm_train_%s.pkl' % START_DT_STR
-        train_file = file.open(train_file_name, 'wb')
+        train_file = open(train_file_name, 'wb')
         ptf('\n>> Writing train results to %s' % train_file_name, LOGFILE)
-        fit_file.close()
+        pickle.dump(sm, train_file, -1)
+        train_file.close()
 
         # predict
         start = time.time()
@@ -336,8 +343,9 @@ if __name__ == '__main__':
 
         # Pickle model results
         test_file_name = 'sm_test_%s.pkl' % START_DT_STR
-        test_file = file.open(test_file_name, 'wb')
+        test_file = open(test_file_name, 'wb')
         ptf('\n>> Writing test results to %s' % test_file_name, LOGFILE)
+        pickle.dump(sm, test_file, -1)
         test_file.close()
 
 
