@@ -18,11 +18,17 @@ from featurizer import PolynomialFeaturizer
 from timeseriesplotter import SpotTimePlot
 from collections import defaultdict
 from unittests import run_unittests
+import multiprocessing
+from utils_capstone import print_to_file_and_terminal as ptf
 
 from sklearn.linear_model import LogisticRegression
 
 # use pympler to do memory diagnosis
 from pympler import asizeof, tracker, classtracker
+
+START_DT = datetime.datetime.now()
+START_DT_STR = START_DT.strftime('%Y-%m-%d_%H-%M-%S')
+LOGFILE = open('log_%s.txt' % START_DT_STR, 'w')
 
 def timestamp_interpretter(x):
     # TODO - fix regex for timestamps of the type:
@@ -42,7 +48,7 @@ def load_spots_files(x, root_folder, column_headers,
     relpath = x['Folder'].replace(ntpath.sep, os.sep)
     data_file = os.path.join(root_folder, relpath, fname)
     if verbose:
-        print data_file
+        ptf(['Loading data from', data_file], LOGFILE)
     # load data file
     mini_df = pd.read_table(data_file, header=None)
     # some files have extra tab, creating extra data column.
@@ -114,8 +120,9 @@ def split_train_test(X, y, test_size=0.25, verbose=False):
     #                                                 stratify=y['classification'].unique())
     sss = StratifiedShuffleSplit(y=y['classification'], n_iter=1, test_size=test_size, random_state=1)
     for train_index, test_index in sss:
-        print 'Train: ', len(train_index)
-        print 'Test: ', len(test_index)
+
+        ptf(['Train: ', len(train_index)], LOGFILE)
+        ptf(['Test: ', len(test_index)], LOGFILE)
 
     X_train = X.iloc[train_index]
     X_test = X.iloc[test_index]
@@ -123,10 +130,10 @@ def split_train_test(X, y, test_size=0.25, verbose=False):
     y_test = y.iloc[test_index]
 
     if verbose:
-        print '\nTEST summary:'
-        print y_test.groupby('classification').count()
-        print '\nTRAIN summary:'
-        print y_train.groupby('classification').count()
+        ptf( '\nTEST summary:', LOGFILE)
+        ptf( y_test.groupby('classification').count(), LOGFILE)
+        ptf( '\nTRAIN summary:', LOGFILE)
+        ptf( y_train.groupby('classification').count(), LOGFILE)
 
     return X_train, X_test, y_train, y_test
 
@@ -165,7 +172,7 @@ def find_data_anomalies(df, Imax=4096.0, Imin=0.0):
     return an_df
 
 def load_data(root_foler, csv_filename, verbose=False):
-    print 'Loading csv...'
+    ptf( '\n>> Loading csv...\n', LOGFILE)
     df_raw = pd.read_csv(csv_filename)
 
     # only work with "good" trials
@@ -175,11 +182,11 @@ def load_data(root_foler, csv_filename, verbose=False):
     columns_to_drop = populate_columns_to_drop()
 
     start = time.time()
-    print 'Loading data files...'
+    ptf( '\n>> Loading data files...\n', LOGFILE)
     df_raw = df_raw.apply(lambda x: load_spots_files(x, root_folder, column_headers,
                                                 columns_to_drop), axis=1)
     end = time.time()
-    print 'Data loaded in %d seconds (%d total trials)' % ((end-start), len(df_raw))
+    ptf( 'Data loaded in %d seconds (%d total trials)' % ((end-start), len(df_raw)), LOGFILE)
 
     # DATA INSPECTION - finding values outside of 0, 4096
     # Reference_time must be greater than 1 if we use DII
@@ -188,11 +195,11 @@ def load_data(root_foler, csv_filename, verbose=False):
     # ==> instrumentation error at that time
     if verbose:
         start = time.time()
-        print 'Finding anomalous trials...'
+        ptf( 'Finding anomalous trials...', LOGFILE)
         an_df = find_data_anomalies(df_raw)
         end = time.time()
-        print 'Anomalous trials found in %d seconds (%d trials):' % ((end-start), len(an_df))
-        print an_df
+        ptf( 'Anomalous trials found in %d seconds (%d trials):' % ((end-start), len(an_df)), LOGFILE)
+        ptf( an_df, LOGFILE)
 
         '''
         Finding anomalous trials...
@@ -219,7 +226,7 @@ def load_data(root_foler, csv_filename, verbose=False):
     # keep column headers around for later use
     df, used_column_headers = prepare_data_frame(df_raw)
 
-    print 'Creating labels...'
+    ptf( 'Creating labels...', LOGFILE)
     label_dictionaries = create_labels_dictionaries()
     df = create_labels(df, label_dictionaries)
 
@@ -230,10 +237,10 @@ def load_data(root_foler, csv_filename, verbose=False):
     y = df[['classification', 'gram', 'detection']]
 
     if verbose:
-        print '\nSummary counts after cleaning:'
-        print y.groupby('gram').count()
-        print y.groupby('detection').count()
-        print y.groupby('classification').count()
+        ptf( '\nSummary counts after cleaning:', LOGFILE)
+        ptf( y.groupby('gram').count(), LOGFILE)
+        ptf( y.groupby('detection').count(), LOGFILE)
+        ptf( y.groupby('classification').count(), LOGFILE)
 
     return X, y, used_column_headers, df, df_raw
 
@@ -241,6 +248,17 @@ if __name__ == '__main__':
     verbose = True
     quickload = True
     profile = False
+    debug = True
+
+    n_cpus = multiprocessing.cpu_count()
+    n_jobs = 1
+
+
+    ptf('====> Starting job ID: %s <====' % START_DT_STR, LOGFILE)
+    ptf('\tn_jobs: %d\tn_cpus: %d' % (n_jobs, n_cpus), LOGFILE)
+    ptf('\tdebug: %s' % debug, LOGFILE)
+    ptf('\tprofile: %s' % profile, LOGFILE)
+    ptf('\tverbose: %s' % verbose, LOGFILE)
 
     if profile:
         # set-up some tracking statements from pympler
@@ -266,7 +284,7 @@ if __name__ == '__main__':
         csv_filename = os.path.join(root_folder, 'Sepsis_JCM.csv')
 
         X, y, used_column_headers, df, df_raw = load_data(root_folder, csv_filename, verbose=False)
-        print 'Test/train split...'
+        ptf( '\n>> Test/train split...', LOGFILE)
         X_train, X_test, y_train, y_test = split_train_test(X,y, test_size=0.20)
 
 
@@ -276,49 +294,63 @@ if __name__ == '__main__':
     if True:
         start = time.time()
         sm = SeriesModel(
+            logfile = LOGFILE,
             color_scale = 'RGB',
             color_vector_type = 'DI',
             reference_time = 9,
             min_time = 3,
             detection_model = 'LR',
-            detection_model_arguments = {'n_jobs':-1},
+            detection_model_arguments = {'n_jobs':n_jobs},
             gram_model = 'LR',
-            gram_model_arguments = {'n_jobs':-1, 'multi_class':'ovr'},
+            gram_model_arguments = {'n_jobs':n_jobs, 'multi_class':'ovr'},
             classification_model = 'LR',
-            classification_model_arguments = {'n_jobs':-1, 'multi_class':'ovr'},
+            classification_model_arguments = {'n_jobs':n_jobs, 'multi_class':'ovr'},
             detection_featurizer = 'poly',
             detection_featurizer_arguments = {'n':4},
             gram_featurizer = 'detection',
             classification_featurizer = 'detection'
             )
 
-        sm.fit(X_train,y_train, verbose=verbose, debug=False)
+        sm.fit(X_train,y_train, verbose=verbose, debug=debug)
 
         end = time.time()
 
-        print '\n\n>>Model fit (%d times, %d samples) in %d seconds (%d mins)<<\n\n' % (len(sm.times), len(y_train), (end-start), (end-start)/60.0)
+        ptf( '\n\n>> Model fit (%d times, %d samples) in %d seconds (%d mins) <<\n\n' % (len(sm.times), len(y_train), (end-start), (end-start)/60.0), LOGFILE)
+
+        # Pickle model
+        train_file_name = 'sm_train_%s.pkl' % START_DT_STR
+        train_file = file.open(train_file_name, 'wb')
+        ptf('\n>> Writing train results to %s' % train_file_name, LOGFILE)
+        fit_file.close()
 
         # predict
         start = time.time()
         yd, yg, yc = sm.predict(X_test, verbose=verbose)
         end = time.time()
-        print '\n\n>>Model predictions (%d times, %d samples) in %d seconds (%d mins)<<\n\n' % (len(sm.times), len(y_test), (end-start), (end-start)/60.0)
+        ptf( '\n\n>> Model predictions (%d times, %d samples) in %d seconds (%d mins) <<\n\n' % (len(sm.times), len(y_test), (end-start), (end-start)/60.0), LOGFILE)
 
         start = time.time()
         results = sm.score(y_test, verbose=verbose)
         end = time.time()
-        print '\n\n>>Model scores (%d times, %d samples) in %d seconds (%d mins)<<\n\n' % (len(sm.times), len(y_test), (end-start), (end-start)/60.0)
+        ptf( '\n\n>> Model scores (%d times, %d samples) in %d seconds (%d mins) <<\n\n' % (len(sm.times), len(y_test), (end-start), (end-start)/60.0), LOGFILE)
+
+        # Pickle model results
+        test_file_name = 'sm_test_%s.pkl' % START_DT_STR
+        test_file = file.open(test_file_name, 'wb')
+        ptf('\n>> Writing test results to %s' % test_file_name, LOGFILE)
+        test_file.close()
 
 
         if profile:
-            print '\nSERIESMODEL profiling'
-            print 'Look at size of seriesmodel object'
-            print asizeof.asizeof(sm)
-            print asizeof.asized(sm, detail=1).format()
+            ptf( '\nSERIESMODEL profiling', LOGFILE)
+            ptf( 'Look at size of seriesmodel object', LOGFILE)
+            ptf( asizeof.asizeof(sm), LOGFILE)
+            ptf( asizeof.asized(sm, detail=1).format(), LOGFILE)
 
-            print 'Look at how the SeriesModel class is doing'
+            ptf( 'Look at how the SeriesModel class is doing', LOGFILE)
             tr_sm.create_snapshot()
             tr_sm.stats.print_summary()
+            tr_sm.stats.print_summary() >> LOGFILE
 
             # print '\nPOLYNOMIALFEATURIZER profiling'
             # print 'Size of PF object'
@@ -353,10 +385,14 @@ if __name__ == '__main__':
             # tr_lr.create_snapshot()
             # tr_lr.stats.print_summary()
 
-            print 'PROFILING'
-            print 'Look at memory leaks up to this point'
+            ptf( 'PROFILING', LOGFILE)
+            ptf( 'Look at memory leaks up to this point', LOGFILE)
+            tr.print_diff() >> LOGFILE
             tr.print_diff()
 
     ### Unittests ###
     if False:
         sm_unit = run_unittests(X_test, y_test, verbose=False)
+
+
+    LOGFILE.close()

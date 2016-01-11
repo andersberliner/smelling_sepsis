@@ -12,8 +12,11 @@ from featurizer import PolynomialFeaturizer
 import multiclassmetrics as mcm
 import time
 
+from utils_capstone import print_to_file_and_terminal as ptf
+
 class SeriesModel(object):
-    def __init__(self, X=None, y=None,
+    def __init__(self, logfile=None,
+                    X=None, y=None,
                     color_scale = 'RGB',
                     color_vector_type = 'DI',
                     reference_time = 0,
@@ -40,6 +43,8 @@ class SeriesModel(object):
                     classification_featurizer_arguments={}):
         self.X = X
         self.y = y
+
+        self.logfile = logfile
 
         self.color_scale = color_scale
         self.color_vector_type = color_vector_type
@@ -167,8 +172,8 @@ class SeriesModel(object):
         X = self._prepare_data(X)
 
         if self.max_time > self.trial_lengths.min():
-            print '***FIT ERROR***'
-            print 'Minimum trial_length, %s, is less than max_time, %s' % (self.trial_lengths.min(), self.max_time)
+            ptf( '***FIT ERROR***', self.logfile)
+            ptf( 'Minimum trial_length, %s, is less than max_time, %s' % (self.trial_lengths.min(), self.max_time), self.logfile)
             return
 
         # start with the second time
@@ -183,7 +188,7 @@ class SeriesModel(object):
             start = time.time()
 
             if self.verbose:
-                print '\n\n TIMESTEP %d...' % t
+                ptf( '\n\nTIMESTEP %d...' % t, self.logfile)
             self._fit_one_timestep(X, y, t, use_last_timestep_results)
             use_last_timestep_results = self.use_last_timestep_results
 
@@ -193,7 +198,7 @@ class SeriesModel(object):
 
             end = time.time()
             if True:
-                print '\n TIMESTEP %d took %d seconds' % (t, (end-start))
+                ptf( '\n----TIMESTEP %d took %d seconds----\n\n' % (t, (end-start)), self.logfile)
 
 
 
@@ -250,15 +255,28 @@ class SeriesModel(object):
 
         if featurizer_type == 'poly':
             featurizer_arguments['reference_time'] = self.reference_time
-            # featurizer_arguments['verbose'] = self.verbose
+            featurizer_arguments['logfile'] = self.logfile
+            featurizer_arguments['verbose'] = self.verbose
             featurizer = PolynomialFeaturizer(**featurizer_arguments)
         elif featurizer_type == 'kink':
+            featurizer_arguments['reference_time'] = self.reference_time
+            featurizer_arguments['logfile'] = self.logfile
+            featurizer_arguments['verbose'] = self.verbose
             pass
         elif featurizer_type == 'sigmoid':
+            featurizer_arguments['reference_time'] = self.reference_time
+            featurizer_arguments['logfile'] = self.logfile
+            featurizer_arguments['verbose'] = self.verbose
             pass
         elif featurizer_type == 'forecast':
+            featurizer_arguments['reference_time'] = self.reference_time
+            featurizer_arguments['logfile'] = self.logfile
+            featurizer_arguments['verbose'] = self.verbose
             pass
         elif featurizer_type == 'longitudinal':
+            featurizer_arguments['reference_time'] = self.reference_time
+            featurizer_arguments['logfile'] = self.logfile
+            featurizer_arguments['verbose'] = self.verbose
             pass
 
         X_features, scores = featurizer.fit_transform(X_train)
@@ -360,7 +378,7 @@ class SeriesModel(object):
         X_train = self._subset_data(X, number_of_times)
 
         # featurize
-        print 'Featurizing nt=%d ...' % number_of_times
+        ptf( 'Featurizing nt=%d ...' % number_of_times, self.logfile)
         X_detection, X_gram, X_classification = self._featurize(X_train, number_of_times)
         np_X_detection = self._pandas_to_numpy(X_detection)
         if use_last_timestep_results:
@@ -368,7 +386,7 @@ class SeriesModel(object):
             np_X_detection = np.hstack((np_X_detection,
                                         self.probabilities['detection'][:,1].reshape(-1,1)))
         # fit detection
-        print 'Training detection nt=%d ...' % number_of_times
+        ptf( 'Training detection nt=%d ...' % number_of_times, self.logfile)
         # detection_model = self.fit_detection(X_detection, y['detection'])
         # print type(X), type(X_train), type(X_detection), type(np_X_detection)
         # print X.shape, X_train.shape, X_detection.shape, np_X_detection.shape
@@ -390,7 +408,7 @@ class SeriesModel(object):
         y_probabilities_detection = detection_model.predict_proba(np_X_detection)
 
         # fit gram
-        print 'Training gram nt=%d ...' % number_of_times
+        ptf( 'Training gram nt=%d ...' % number_of_times, self.logfile)
         np_X_gram = self._pandas_to_numpy(X_gram)
         # print np_X_gram.shape
         # print y_predict_detection.shape
@@ -415,7 +433,7 @@ class SeriesModel(object):
         y_probabilities_gram = gram_model.predict_proba(np_X_gram)
 
         # fit classification
-        print 'Training classification nt=%d ...' % number_of_times
+        ptf( 'Training classification nt=%d ...' % number_of_times, self.logfile)
         np_X_classification = self._pandas_to_numpy(X_classification)
         # print np_X_classification.shape
         # print y_probabilities_detection[:,1].reshape(-1,1).shape
@@ -495,7 +513,7 @@ class SeriesModel(object):
 
             end = time.time()
             if self.verbose:
-                print '\n PREDICT TIMESTEP %d took %d seconds' % (t, (end-start))
+                ptf( '\n----PREDICT TIMESTEP %d took %d seconds----\n\n' % (t, (end-start)), self.logfile)
 
         return self.predictions['detection'], self.predictions['gram'], self.predictions['classification']
 
@@ -508,7 +526,7 @@ class SeriesModel(object):
         X_detection, X_gram, X_classification = self._predict_featurize(X, number_of_times)
 
         # predict detection
-        print 'Predicting detection nt=%d ...' % number_of_times
+        ptf( 'Predicting detection nt=%d ...' % number_of_times, self.logfile)
         np_X_detection = self._pandas_to_numpy(X_detection)
 
         # use last timestep if required
@@ -523,7 +541,7 @@ class SeriesModel(object):
         y_probabilities_detection = detection_model.predict_proba(np_X_detection)
 
         # predict gram
-        print 'Predicting gram nt=%d ...' % number_of_times
+        ptf( 'Predicting gram nt=%d ...' % number_of_times, self.logfile)
         np_X_gram = self._pandas_to_numpy(X_gram)
         np_X_gram = np.hstack((np_X_gram, y_probabilities_detection[:,1].reshape(-1,1)))
 
@@ -536,7 +554,7 @@ class SeriesModel(object):
         y_probabilities_gram = gram_model.predict_proba(np_X_gram)
 
         # fit classification
-        print 'Training classification nt=%d ...' % number_of_times
+        ptf( 'Training classification nt=%d ...' % number_of_times, self.logfile)
         np_X_classification = self._pandas_to_numpy(X_classification)
         np_X_classification = np.hstack((np_X_classification,
                             y_probabilities_detection[:,1].reshape(-1,1),
@@ -647,18 +665,18 @@ class SeriesModel(object):
                              number_of_times):
         # detection - calculate results
         if self.verbose:
-            print 'Detection results'
-            print mcm.classification_report_ovr(y_train['detection'],
+            ptf( 'Detection results', self.logfile)
+            ptf( mcm.classification_report_ovr(y_train['detection'],
                 y_predict_detection,
-                self.confusion_labels['detection'])
-            print 'Gram results'
-            print mcm.classification_report_ovr(y_train['gram'],
+                self.confusion_labels['detection']), self.logfile)
+            ptf( 'Gram results', self.logfile)
+            ptf( mcm.classification_report_ovr(y_train['gram'],
                 y_predict_gram,
-                self.confusion_labels['gram'])
-            print 'Classification results'
-            print mcm.classification_report_ovr(y_train['classification'],
+                self.confusion_labels['gram']), self.logfile)
+            ptf( 'Classification results', self.logfile)
+            ptf( mcm.classification_report_ovr(y_train['classification'],
                 y_predict_classification,
-                self.confusion_labels['classification'], s1=30)
+                self.confusion_labels['classification'], s1=30), self.logfile)
 
         scores = mcm.scores_binary(y_train['detection'], y_predict_detection)
         # print scores

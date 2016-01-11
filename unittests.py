@@ -6,12 +6,12 @@ from seriesmodel import SeriesModel
 from featurizer import PolynomialFeaturizer
 from timeseriesplotter import SpotTimePlot
 
-def run_unittests(X_test, y_test, verbose=False):
+def run_unittests(X_test, y_test, verbose=True):
     print 'Do some unit tests on seriesmodel, featurizer...'
     print '0) Set-up (prepare data)'
     sm = SeriesModel(reference_time=9)
 
-    if False:
+    if True:
         print 'A) seriesmodel preprocessing'
         if verbose:
             print X_test.iloc[0][0:5, 0:4]
@@ -28,7 +28,7 @@ def run_unittests(X_test, y_test, verbose=False):
     sm.confusion_labels = sm._build_confusion_labels(y_test)
     Z = sm._prepare_data(X_test)
 
-    if False:
+    if True:
         print 'B) Set-up results dataframes'
         if verbose:
             print 'Predictions'
@@ -86,7 +86,7 @@ def run_unittests(X_test, y_test, verbose=False):
         print sm.scores['gram']['n'].iloc[0]['confusion_matrix']
 
 
-    if False:
+    if True:
         print 'A) Subset data'
         nt = 4
         X_sub = sm._subset_data(Z, nt)
@@ -144,7 +144,7 @@ def run_unittests(X_test, y_test, verbose=False):
 
 
 
-    if False:
+    if True:
         print '\n\n2) PolynomialFeaturizer'
         start = time.time()
 

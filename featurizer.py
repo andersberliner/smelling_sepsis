@@ -7,12 +7,14 @@ import numpy as np
 import pandas as pd
 from itertools import izip
 import time
+from utils_capstone import print_to_file_and_terminal as ptf
 
 class PolynomialFeaturizer(object):
-    def __init__(self, n=4, reference_time=0, verbose=True):
+    def __init__(self, n=4, reference_time=0, verbose=True, logfile=None):
         self.n = n
         self.reference_time = reference_time
         self.verbose = verbose
+        self.logfile = logfile
 
     def fit(self, X):
         pass
@@ -83,7 +85,7 @@ class PolynomialFeaturizer(object):
         for trial_index, x in enumerate(X):
             if trial_index % 100 == 0:
                 if self.verbose:
-                    print 'Featurizing trial ', trial_index
+                    ptf( 'Featurizing trial %d'%  trial_index, self.logfile)
             # regress coefficients are (poly order +1 )x(n_spots)
             coefficients = np.zeros(((self.n+1), number_of_spots))
             scores = np.zeros(number_of_spots)
@@ -109,7 +111,7 @@ class PolynomialFeaturizer(object):
             scores_.iloc[trial_index] = scores
 
         end = time.time()
-        print 'Regressed %d trials, n=%d in %d seconds' % (len(X), self.n, (end-start))
+        ptf( 'Regressed %d trials, n=%d in %d seconds' % (len(X), self.n, (end-start)), self.logfile)
         return coef_, scores_
 
 
