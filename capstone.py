@@ -250,11 +250,11 @@ if __name__ == '__main__':
     verbose = True
     quickload = True
     profile = False
-    debug = True
+    debug = False
 
     n_cpus = multiprocessing.cpu_count()
     # model conditions
-    n_jobs = 1
+    n_jobs = n_cpus
     use_last_timestep_results = False
 
 
