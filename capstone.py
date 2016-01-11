@@ -238,9 +238,9 @@ def load_data(root_foler, csv_filename, verbose=False):
     return X, y, used_column_headers, df, df_raw
 
 if __name__ == '__main__':
-    verbose = False
+    verbose = True
     quickload = True
-    profile = True
+    profile = False
 
     if profile:
         # set-up some tracking statements from pympler
