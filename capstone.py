@@ -12,7 +12,7 @@ import re
 import datetime
 from sklearn.cross_validation import train_test_split, StratifiedShuffleSplit
 import time
-import rpy2
+# import rpy2
 from seriesmodel import SeriesModel
 from featurizer import PolynomialFeaturizer
 from timeseriesplotter import SpotTimePlot
