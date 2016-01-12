@@ -250,7 +250,7 @@ if __name__ == '__main__':
     verbose = True
     quickload = True
     profile = False
-    debug = False
+    debug = True
 
     n_cpus = multiprocessing.cpu_count()
     # model conditions

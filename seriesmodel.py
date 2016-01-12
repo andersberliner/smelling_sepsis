@@ -11,6 +11,7 @@ from collections import defaultdict
 from featurizer import PolynomialFeaturizer
 import multiclassmetrics as mcm
 import time
+from functools import partial
 
 from utils_capstone import print_to_file_and_terminal as ptf
 
@@ -23,22 +24,29 @@ class SeriesModel(object):
                     max_time = 60, # 20 hrs max
                     min_time = 1, # time after ref_time to start fitting
                     use_last_timestep_results = False, # True for simple, False do to Bayesian approach
+                    features_pickle = 'features.pkl',
+                    featurizer_pickle = 'featurizer.pkl',
+                    featurizer_coldstart = True,
+                    reducer_pickle = 'reducer.pkl',
+                    reducer_coldstart = True,
+                    scaler_pickle = 'scaler.pkl',
+                    scaler_coldstart = True,
                     detection_model='LR',
                     detection_model_arguments={},
-                    detection_preprocessor='pca',
-                    detection_preprocessor_arguments={},
+                    detection_reducer='pca',
+                    detection_reducer_arguments={},
                     detection_featurizer='poly',
                     detection_featurizer_arguments={},
                     gram_model='LR',
                     gram_model_arguments={},
-                    gram_preprocessor='PCA',
-                    gram_preprocessor_arguments={},
+                    gram_reducer='PCA',
+                    gram_reducer_arguments={},
                     gram_featurizer='detection',
                     gram_featurizer_arguments={},
                     classification_model='LR',
                     classification_model_arguments={},
-                    classification_preprocessor='PCA',
-                    classification_preprocessor_arguments={},
+                    classification_reducer='PCA',
+                    classification_reducer_arguments={},
                     classification_featurizer='gram',
                     classification_featurizer_arguments={}):
         self.X = X
@@ -53,6 +61,10 @@ class SeriesModel(object):
         self.min_time = min_time
 
         self.use_last_timestep_results = use_last_timestep_results
+        self.featurizer_pickle = featurizer_pickle
+        self.featurizer_coldstart = featurizer_coldstart
+        self.reducer_pickle = reducer_pickle
+        self.reducer_coldstart = reducer_coldstart
 
         self.verbose = False
         self.trial_lengths = None
@@ -60,34 +72,36 @@ class SeriesModel(object):
 
         # self.models is a group of models for detection, gram, classification
         # at each timepoint
+        self.features = defaultdict(dict) # 10: [[np X n]]
         self.models = defaultdict(dict)
         self.featurizers = defaultdict(dict)
-        self.preprocessors = defaultdict(dict)
+        self.scalers = default(dict)
+        self.reducers = defaultdict(dict)
         self.times = []
 
-        # set base models and preprocessors
+        # set base models and reducers
         self.detection_base_model = detection_model
-        self.detection_base_preprocessor = detection_preprocessor
+        self.detection_base_reducer = detection_reducer
         self.detection_base_featurizer = detection_featurizer
 
         self.gram_base_model = gram_model
-        self.gram_base_preprocessor = gram_preprocessor
+        self.gram_base_reducer = gram_reducer
         self.gram_base_featurizer = gram_featurizer
 
         self.classification_base_model = classification_model
-        self.classification_base_preprocessor = classification_preprocessor
+        self.classification_base_reducer = classification_reducer
         self.classification_base_featurizer = classification_featurizer
 
         self.detection_base_model_arguments = detection_model_arguments
-        self.detection_base_preprocessor_arguments = detection_preprocessor_arguments
+        self.detection_base_reducer_arguments = detection_reducer_arguments
         self.detection_base_featurizer_arguments = detection_featurizer_arguments
 
         self.gram_base_model_arguments = gram_model_arguments
-        self.gram_base_preprocessor_arguments = gram_preprocessor_arguments
+        self.gram_base_reducer_arguments = gram_reducer_arguments
         self.gram_base_featurizer_arguments = gram_featurizer_arguments
 
         self.classification_base_model_arguments = classification_model_arguments
-        self.classification_base_preprocessor_arguments = classification_preprocessor_arguments
+        self.classification_base_reducer_arguments = classification_reducer_arguments
         self.classification_base_featurizer_arguments = classification_featurizer_arguments
 
     # def __repr__(self):
@@ -158,7 +172,7 @@ class SeriesModel(object):
                 self.scores[label]['macro'] = pd.DataFrame(columns=df_columns)
 
     def _prepare_data(self, X):
-        Z = self.preprocess(X.copy())
+        Z = self.preprocess(X)
 
         self._build_results_dataframes(len(Z))
         self.trial_lengths = self.find_trial_lengths(Z)
@@ -169,12 +183,6 @@ class SeriesModel(object):
     def fit(self, X, y, verbose=False, debug=False):
         self.verbose = verbose
         self.confusion_labels = self._build_confusion_labels(y)
-        X = self._prepare_data(X)
-
-        if self.max_time > self.trial_lengths.min():
-            ptf( '***FIT ERROR***', self.logfile)
-            ptf( 'Minimum trial_length, %s, is less than max_time, %s' % (self.trial_lengths.min(), self.max_time), self.logfile)
-            return
 
         # start with the second time
         t = self.reference_time + self.min_time
@@ -184,6 +192,29 @@ class SeriesModel(object):
             self.times = [30,40,50]
         else:
             self.times = np.arange(t, self.max_time, 1)
+
+        self._build_results_dataframes(len(X))
+        self.trial_lengths = self.find_trial_lengths(X)
+        self.inspect_trial_shapes(X)
+
+        # Check trial integrity
+        if self.max_time > self.trial_lengths.min():
+            ptf( '***FIT ERROR***', self.logfile)
+            ptf( 'Minimum trial_length, %s, is less than max_time, %s' % (self.trial_lengths.min(), self.max_time), self.logfile)
+            return
+
+        # generate all features or load all features
+        if self.featurizers_coldstart:
+            X_preprocessed = self.preprocess(X)
+            X_featurized = self.featurize(X_preprocessed, self.featurizer_pickle)
+            X_scaled = self.scale(X_featurized, self.scaler_pickle)
+            X_reduced = self.reduce(X_scaled, self.reducer_pickle)
+            self.pickle_features(X_reduced, self.features_pickle)
+        else:
+            X = self.load_features(self.features_pickle)
+
+
+
         for t in self.times:
             start = time.time()
 
@@ -201,6 +232,122 @@ class SeriesModel(object):
                 ptf( '\n----TIMESTEP %d took %d seconds----\n\n' % (t, (end-start)), self.logfile)
 
 
+    def featurize(self, X, featurizer_pickle):
+        start = time.time()
+        ptf('\n>> Featurizing data ...', self.logfile)
+        for t in self.times():
+            # featurize, storing featurizers at each timestep
+            if self.verbose:
+                ptf( 'Featurizing nt=%d ...' % number_of_times, self.logfile)
+            X_train = self._subset_data(X, number_of_times)
+            X_detection, X_gram, X_classification = self._featurize_one_timestep(X_train, t)
+
+            # convert to numpy arrays
+            np_X_detection = self._pandas_to_numpy(X_detection)
+            np_X_gram = self._pandas_to_numpy(X_gram)
+            np_X_classification = self._pandas_to_numpy(X_classification)
+            if self.debug:
+                print 'Checking featurized shapes', np_X_detection.shape, np_X_gram.shape, np_X_classification.shape
+
+            # store features
+            self.features['detection'][t] = np_X_detection
+            self.features['gram'][t] = np_X_gram
+            self.features['classification'][t] = np_X_classification
+
+        end = time.time()
+        ptf('\n>> Featurizing completed (%s seconds) <<' % (end-start), self.logfile)
+
+        # pickle featurizers
+        start = time.time()
+        featurizer_file_name = featurizer_pickle
+        featurizer_file = open(featurizer_file_name, 'wb')
+        ptf('\n>> Pickling featurizers to %s ...' % featurizer_file_name, self.logfile)
+        pickle.dump(self.featurizers, featurizer_file, -1)
+        featurizer_file.close()
+
+        end = time.time()
+        ptf('\n>> Pickling completed (%s seconds) <<' % (end-start), self.logfile)
+
+        return self.features
+
+    def scale(self, X, scaler_pickle):
+        start = time.time()
+        ptf('\n>> Scaling data...', self.logfile)
+        for t in self.times():
+            # featurize, storing featurizers at each timestep
+            if self.verbose:
+                ptf( 'Scaling nt=%d ...' % number_of_times, self.logfile)
+            np_X_detection, np_X_gram, np_X_classification = self._scale_one_timestep(X, t)
+
+            if self.debug:
+                print 'Checking scaled shapes', np_X_detection.shape, np_X_gram.shape, np_X_classification.shape
+
+            # store scaled features
+            self.features['detection'][t] = np_X_detection
+            self.features['gram'][t] = np_X_gram
+            self.features['classification'][t] = np_X_classification
+
+        end = time.time()
+        ptf('\n>> Scaling completed (%s seconds) <<' % (end-start), self.logfile)
+
+        # pickle scalers
+        start = time.time()
+        scaler_file_name = scaler_pickle
+        scaler_file = open(scaler_file_name, 'wb')
+        ptf('\n>> Pickling scalers to %s ...' % scaler_file_name, self.logfile)
+        pickle.dump(self.scalers, scaler_file, -1)
+        scaler_file.close()
+
+        end = time.time()
+        ptf('\n>> Pickling completed (%s seconds) <<' % (end-start), self.logfile)
+
+        return self.features
+
+    def reduce(self, X, reducer_pickle):
+        start = time.time()
+        ptf('\n>> Featurizing data ...', self.logfile)
+        for t in self.times():
+            # featurize, storing featurizers at each timestep
+            if self.verbose:
+                ptf( 'Reducing nt=%d ...' % number_of_times, self.logfile)
+            np_X_detection, np_X_gram, np_X_classification = self._reduce_one_timestep(X, t)
+
+            if self.debug:
+                print 'Checking reduced shapes', np_X_detection.shape, np_X_gram.shape, np_X_classification.shape
+
+            # store reduced features
+            self.features['detection'][t] = np_X_detection
+            self.features['gram'][t] = np_X_gram
+            self.features['classification'][t] = np_X_classification
+
+        end = time.time()
+        ptf('\n>> Reducing completed (%s seconds) <<' % (end-start), self.logfile)
+
+        # pickle reducers
+        start = time.time()
+        reducer_file_name = reducer_pickle
+        reducer_file = open(reducer_file_name, 'wb')
+        ptf('\n>> Pickling reducers to %s' % reducer_file_name, self.logfile)
+        pickle.dump(self.reducers, reducer_file, -1)
+        reducer_file.close()
+
+        end = time.time()
+        ptf('\n>> Pickling completed (%s seconds) <<' % (end-start), self.logfile)
+
+        return self.features
+
+
+
+    def pickle_features(self, features_pickle):
+        # pickle features
+        features_file_name = features_pickle
+        features_file = open(features_file_name, 'wb')
+        ptf('\n>> Pickling featurizers to %s' % features_file_name, self.logfile)
+        pickle.dump(sm, features_file, -1)
+        features_file.close()
+
+
+
 
 
     def bayes_update(self,t):
@@ -209,6 +356,10 @@ class SeriesModel(object):
         pass
 
     def preprocess(self, X):
+        start = time.time()
+        ptf('\n>> Preprocessing data...', self.logfile)
+
+        X = X.copy()
         reference_time = self.reference_time
         # change color-scale as required
         # assume it's RGB
@@ -222,6 +373,8 @@ class SeriesModel(object):
         elif self.color_vector_type == 'DII':
             X = X.apply(lambda x: self._calculate_normalized_differences(x, reference_time))
 
+        end = time.time()
+        ptf('\n>> Prepocessing completed (%s seconds) <<' % (end-start), self.logfile)
         return X
 
     def _calculate_normalized_differences(self, x, reference_time):
@@ -305,9 +458,9 @@ class SeriesModel(object):
     #     # featurizer = PolynomialFeaturizer()
     #     X_classification = self.classification_featurizer(X_train)
     #     return X_classification
-
-    def _featurize(self, X_train, number_of_times):
+    def _featurize_one_timestep(self, X_train, number_of_times):
         # detection
+        start = time.time()
         X_detection, detection_featurizer = self._featurize_class(X_train,
                                 self.detection_base_featurizer,
                                 self.detection_base_featurizer_arguments)
@@ -338,7 +491,36 @@ class SeriesModel(object):
 
         self.featurizers['classification'][number_of_times] = classification_featurizer
 
+        end = time.time()
+        if self.verbose:
+            ptf('... %d seconds' % (end-time))
         return X_detection, X_gram, X_classification
+
+    def _scale_class(self, X):
+        ss = StandardScaler()
+        X_scaled = ss.fit_transform(X)
+
+        return X_scaled, ss
+
+
+    def _scale_one_timestep(self, X_train, number_of_times):
+        start = time.time()
+        # detection
+        X_detection_scaled, detection_scaler = self._scale_class(X_train['detection'][number_of_times])
+        self.scalers['detection'][number_of_times] = detection_scaler
+
+        # gram
+        X_gram_scaled, gram_scaler = self._scale_class(X_train['gram'][number_of_times])
+        self.scalers['gram'][number_of_times] = gram_scaler
+
+        # classification
+        X_classification_scaled, classification_scaler = self._scale_class(X_train['classification'][number_of_times])
+        self.scalers['classification'][number_of_times] = classification_scaler
+
+        end = time.time()
+        if self.verbose:
+            ptf('... %d seconds' % (end-time))
+        return X_detection_scaled, X_gram_scaled, X_classification_scaled
 
     def _fit_class(self, X_train, y_train, model_type, model_argmuents, step=None):
         if model_type == 'LR':
@@ -355,6 +537,59 @@ class SeriesModel(object):
         model.fit(X_train, y_train)
 
         return model
+
+    def _reduce_class(self, X_train, reducer_type, reducer_arguments):
+        X_features = X_train.copy()
+        if not reducer_type:
+            return X_features, None
+
+        if reducer_type == 'pca':
+            reducer = PCA(**reducer_arguments)
+        else:
+            ptf('*** Unknown reducer_type %s.  No transformations done ***' % reducer_type, self.logfile)
+
+        X_features, scores = reducer.fit_transform(X_train)
+
+        return X_features, featurizer
+
+    def _reduce_one_timestep(self, X_train, number_of_times):
+        start = time.time()
+        # detection
+        X_detection, detection_reducer = self._reduce_class(X_train,
+                                self.detection_base_reducer,
+                                self.detection_base_reducer_arguments)
+        self.reducers['detection'][number_of_times] = detection_reducer
+        # for efficiency, if not using different methods, could have
+        # all 3 be the same
+        # gram
+        if self.gram_base_reducer == 'detection':
+            X_gram = X_detection.copy()
+            gram_reducer = detection_reducer
+        else:
+            X_gram, gram_reducer = self._reduce_class(X_train,
+                                    self.gram_base_reducer,
+                                    self.gram_base_reducer_arguments)
+        self.reducers['gram'][number_of_times] = gram_reducer
+
+        # classification
+        if self.classification_base_reducer == 'detection':
+            X_classification = X_detection.copy()
+            classification_reducer = detection_reducer
+        elif self.classification_base_reducer == 'gram':
+            X_classification = X_gram.copy()
+            classification_reducer = gram_reducer
+        else:
+            X_classification, classification_reducer = self._reduce_class(X_train,
+                                    self.classification_base_reducer,
+                                    self.classification_base_reducer_arguments)
+
+        self.reducers['classification'][number_of_times] = classification_reducer
+
+        end = time.time()
+        if self.verbose:
+            ptf('... %d seconds' % (end-time))
+
+        return X_detection, X_gram, X_classification
 
     def _pandas_to_numpy(self, df_X):
         # features are in a pandas dataframe of the format
