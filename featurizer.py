@@ -2,6 +2,7 @@
 # Anders Berliner
 # 20160106
 from sklearn.linear_model import LinearRegression, Ridge, Lasso
+from sklearn.grid_search import GridSearchCV
 from sklearn.preprocessing import PolynomialFeatures
 import numpy as np
 import pandas as pd
@@ -10,11 +11,14 @@ import time
 from output_capstone import print_to_file_and_terminal as ptf
 
 class PolynomialFeaturizer(object):
-    def __init__(self, n=4, reference_time=0, verbose=True, logfile=None):
+    def __init__(self, n=4, reference_time=0,
+            verbose=True, gridsearch=False, logfile=None,
+            regressor_type='OLS'):
         self.n = n
         self.reference_time = reference_time
         self.verbose = verbose
         self.logfile = logfile
+        self.gridsearch  = gridsearch
 
     def fit(self, X):
         pass
@@ -35,7 +39,11 @@ class PolynomialFeaturizer(object):
         # avoid to save on space self.X = X
         poly = PolynomialFeatures(degree=self.n)
 
-        # can use Ridge or Lasso here => gridsearch
+        bestmodel = []
+        best_loss = None
+        if self.gridsearch:
+            # can use Ridge or Lasso here => gridsearch
+            pass
         model = LinearRegression(fit_intercept=False, n_jobs=-1)
 
         coef_, scores_ = self._regress(X, model, poly)

@@ -38,6 +38,7 @@ PICKLE_NAMES = ['Xdf.pkl', 'ydf.pkl', 'used_column_headers.pkl']
 if __name__ == '__main__':
     # Capstone run conditions
     reload_data = False
+    reload_features = False
     pickle_data = False # save loaded data to a pickle for greater loading efficiency
     unittests = False
     profile = False # do memory profiling
@@ -53,6 +54,7 @@ if __name__ == '__main__':
     nfolds = 10 # number of cross_validation folds
     fold_size = 0.1 # size of cross_validation folds
 
+    bigstart = time.time()
     ptf('====> Starting job ID: %s <====' % START_DT_STR, LOGFILE)
     ptf('\tn_jobs: %d\tn_cpus: %d' % (n_jobs, n_cpus), LOGFILE)
     ptf('\tdebug: %s' % debug, LOGFILE)
@@ -118,8 +120,10 @@ if __name__ == '__main__':
 
 
     sm = SeriesModel(
-        featurizer_coldstart = False,
-        logfile = None,
+        featurizer_coldstart = reload_features,
+        scaler_coldstart = reload_features,
+        reducer_coldstart = reload_features,
+        logfile = LOGFILE,
         use_last_timestep_results = use_last_timestep_results,
         color_scale = 'RGB',
         color_vector_type = 'DI',
@@ -139,38 +143,123 @@ if __name__ == '__main__':
         fold_size=fold_size
         )
 
-    sm.setup(X,y)
-    if debug:
-        print sm.confusion_labels
-        print sm.predictions
-        print sm.results
 
-
-
-    Z = sm.preprocess(X)
-    if debug:
-        print len(X), len(Z)
-        print X.iloc[0][8:12,0:4], Z.iloc[0][8:12, 0:4]
 
     if False:
-        # make r-objects to figure out calls of lme4, glmer in rstudio
-        Xsub = sm._subset_data(Z, 50)
 
-        # print stuff
-        longdf = make_long_dataframe(Xsub, y, used_column_headers, Ntimes=50)
+        # i) SETUP
+        sm.setup(X,y)
+        if False:
+            print 'Confusion_labels'
+            print sm.confusion_labels
+            print 'Predictions'
+            print sm.fold_predictions
+            print 'Predcitions test'
+            print sm.fold_predictions_test
+            print 'Probas'
+            print sm.fold_probabilities
+            print 'Probas test'
+            print sm.fold_probabilities_test
+            print 'Results'
+            print sm.results
+            print 'Scores'
+            print sm.scores
+            print 'Scores test'
+            print sm.scores_test
+            print 'Models'
+            print sm.models
+            print 'Featurizers'
+            print sm.featurizers
+            print 'Reducers'
+            print sm.reducers
+            print 'Scalers'
+            print sm.scalers
 
-    # export_to_r_and_pickle(Xsub, y, used_column_headers, 50)
+        # 0) PREPROCESS #
+        Z = sm.preprocess(X)
+        if debug:
+            print len(X), len(Z)
+            print X.iloc[0][8:12,0:4], Z.iloc[0][8:12, 0:4]
 
-    sm.times = [15, 30, 50]
-    sm.verbose = True
-    sm.debug = True
-    Zf = sm.featurize(Z, sm.featurizer_pickle)
-    Zs = sm.scale(Zf, sm.scaler_pickle)
-    Zr = sm.reduce(Zs, sm.reducer_pickle)
+        if False:
+            # make r-objects to figure out calls of lme4, glmer in rstudio
+            Xsub = sm._subset_data(Z, 50)
+
+            # print stuff
+            longdf = make_long_dataframe(Xsub, y, used_column_headers, Ntimes=50)
+
+            # export_to_r_and_pickle(Xsub, y, used_column_headers, 50)
 
 
+        sm.times = [15, 30, 50]
+        sm.verbose = True
+        sm.debug = True
 
+        # 1) FEATURIZE #
+        if reload_features:
+            Zf = sm.featurize(Z, sm.featurizer_pickle)
+            start = time.time()
+            myfile = open('features.pkl', 'wb')
+            pickle.dump(Zf, myfile)
+            myfile.close()
+            end = time.time()
+            ptf('Pickled in %d s' % (start-end), LOGFILE)
+        else:
+            start = time.time()
+            myfile = open('features.pkl', 'rb')
+            Zf = pickle.dump(myfile)
+            myfile.close()
+            sm.features = Zf
+            end = time.time()
+            ptf('Loaded features in %d s' % (start-end), LOGFILE)
+        if debug:
+            print 'Featurizers'
+            print sm.featurizers
 
+        # 2) SCALE #
+        Zs = sm.scale(Zf, sm.scaler_pickle)
+        if debug:
+            print 'Scalers'
+            print sm.scalers
+
+        # 3) REDUCE #
+        Zr = sm.reduce(Zs, sm.reducer_pickle)
+        if debug:
+            print 'Reducers'
+            print sm.reducers
+
+    # Altogether now
+    print ('** DOING THE FIT **')
+    sm.fit(X, y, verbose=verbose, debug=debug)
+
+    bigend = time.time()
+
+    ptf('====> Completed job ID: %s <====' % START_DT_STR, LOGFILE)
+    ptf('====> %d seconds (%0.1f mins)' % ((bigend-bigstart), (bigend-bigstart)/60.0), LOGFILE)
+    ptf('\tntrials: %d' % len(X), LOGFILE)
+    ptf('\tntimes: %d' % len(sm.times), LOGFILE)
+    ptf('\tnfolds: %s' % nfolds, LOGFILE)
+    ptf('\tfold_size: %s' % fold_size, LOGFILE)
+    ptf('\tuse_last_timestep_results: %s' % use_last_timestep_results, LOGFILE)
+    ptf('\tmodel: %s' % model, LOGFILE)
+    ptf('\tfeaturizer: %s' % featurizer, LOGFILE)
+    ptf('\n', LOGFILE)
+    ptf('\treload_data: %s' % reload_data, LOGFILE)
+    ptf('\treload_features: %s' % reload_features, LOGFILE)
+    ptf('\tn_jobs: %d\tn_cpus: %d' % (n_jobs, n_cpus), LOGFILE)
+    ptf('\tdebug: %s' % debug, LOGFILE)
+    ptf('\tprofile: %s' % profile, LOGFILE)
+    ptf('\tverbose: %s' % verbose, LOGFILE)
+    ptf('\n', LOGFILE)
+    ptf('\tfeatures_pickle' % sm.features_pickle, LOGFILE)
+    ptf('\tfold_features_pickle' % sm.fold_features_pickle, LOGFILE)
+
+    model_file_name = 'sm_model_%s.pkl' % START_DT_STR
+
+    model_file = open(model_file_name, 'wb')
+    ptf('\n>> Writing model results to %s' % model_file_name, LOGFILE)
+    pickle.dump(sm, model_file, -1)
+    model_file.close()
 
     if False:
         start = time.time()
@@ -182,6 +271,7 @@ if __name__ == '__main__':
 
         # Pickle model
         train_file_name = 'sm_train_%s.pkl' % START_DT_STR
+
         train_file = open(train_file_name, 'wb')
         ptf('\n>> Writing train results to %s' % train_file_name, LOGFILE)
         pickle.dump(sm, train_file, -1)

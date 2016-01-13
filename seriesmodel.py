@@ -28,6 +28,7 @@ class SeriesModel(object):
                     use_last_timestep_results = False, # True for simple, False do to Bayesian approach
                     features_pickle = 'features.pkl',
                     fold_features_pickle = 'fold_features.pkl',
+                    fold_features_test_pickle = 'fold_features_test.pkl',
                     featurizer_pickle = 'featurizer.pkl',
                     featurizer_coldstart = True,
                     reducer_pickle = 'reducer.pkl',
@@ -78,6 +79,9 @@ class SeriesModel(object):
         self.reducer_coldstart = reducer_coldstart
         self.scaler_pickle = scaler_pickle
         self.scaler_coldstart = scaler_coldstart
+        self.features_pickle = features_pickle
+        self.fold_features_pickle = fold_features_pickle
+        self.fold_features_test_pickle = fold_features_test_pickle
 
         # other run conditions
         self.verbose = False
@@ -87,10 +91,13 @@ class SeriesModel(object):
         # self.models is a group of models for detection, gram, classification
         # at each timepoint
         self.features = defaultdict(dict) # 10: [[np X n]]
-        self.models = defaultdict(dict)
+
         self.featurizers = defaultdict(dict)
-        self.scalers = defaultdict(dict)
-        self.reducers = defaultdict(dict)
+
+        # these are commented since now they get filled in cross_val method
+        # self.models = defaultdict(dict)
+        # self.scalers = defaultdict(dict)
+        # self.reducers = defaultdict(dict)
         self.times = []
 
         # set base models and reducers
@@ -260,28 +267,142 @@ class SeriesModel(object):
         return data
 
     # 5) TRAIN #
-    # def train(self, X, y):
-    #     # pickle reducers
-    #     start = time.time()
-    #     ptf('\n>> 3. Training data ...', self.logfile)
-    #     for fold in self.folds.keys():
-    #         self._reduce_one_fold(X, fold)
-    #
-    #     start = time.time()
-    #     reducer_file_name = reducer_pickle
-    #     reducer_file = open(reducer_file_name, 'wb')
-    #     ptf('\n>> Pickling reducers to %s' % reducer_file_name, self.logfile)
-    #     pickle.dump(self.reducers, reducer_file, -1)
-    #     reducer_file.close()
-    #
-    #     end = time.time()
-    #     ptf('\n>> Pickling completed (%s seconds) <<' % (end-start), self.logfile)
-    #
-    #     return self.fold_features
+    def train(self, X, y, fold, t, use_last_timestep_results=False):
+        number_of_times = t
+        (X_train_detection, X_train_gram, X_train_classification) = X
+        (y_train_detection, y_train_gram, y_train_classification) = y
+
+        # fit detection
+        if self.verbose:
+            ptf( 'Training detection fold:%d, nt:%d ...' % (fold, number_of_times), self.logfile)
+
+        if use_last_timestep_results:
+            # append most recent probabilities of growth (col 1)
+            np_X_detection = np.hstack((X_train_detection,
+                self.fold_probabilities[fold]['detection'][:,1].reshape(-1,1)))
+        else:
+            np_X_detection = X_train_detection
+
+        model_detection = self._fit_class(np_X_detection,
+            y_train_detection,
+            self.detection_base_model,
+            self.detection_base_model_arguments,
+            step=('detection t=%d_%d' % (fold,number_of_times)))
+
+        # store model, predict
+        self.models[fold]['detection'][number_of_times] = model_detection
+        y_predict_detection = model_detection.predict(np_X_detection)
+        y_probabilities_detection = model_detection.predict_proba(np_X_detection)
+
+        # fit gram
+        if self.verbose:
+            ptf( 'Training gram fold:%d, nt=%d ...' % (fold, number_of_times), self.logfile)
+
+        np_X_gram = np.hstack((X_train_gram,
+            y_probabilities_detection[:,1].reshape(-1,1)))
+        if use_last_timestep_results:
+            # append probas of n, p (not control)
+            np_X_gram = np.hstack((np_X_gram,
+                self.fold_probabilities[fold]['gram'][:,:2]))
+
+        model_gram = self._fit_class(np_X_gram,
+            y_train_gram,
+            self.gram_base_model,
+            self.gram_base_model_arguments,
+            step=('gram t=%d_%d' % (fold, number_of_times)))
+
+        # store model, predict
+        self.models[fold]['gram'][number_of_times] = model_gram
+        y_predict_gram = model_gram.predict(np_X_gram)
+        y_probabilities_gram = model_gram.predict_proba(np_X_gram)
+
+        # fit classification
+        if self.verbose:
+            ptf( 'Training classification fold:%d, nt=%d ...' % (fold, number_of_times), self.logfile)
+
+        np_X_classification = np.hstack((X_train_classification,
+            y_probabilities_detection[:,1].reshape(-1,1),
+            y_probabilities_gram[:,:-1]))
+
+        if use_last_timestep_results:
+            # append probas of all non-control classes
+            np_X_classification = np.hstack((np_X_classification,
+                self.fold_probabilities[fold]['classification'][:,1:]))
+
+        model_classification = self._fit_class(np_X_classification,
+            y_train_classification,
+            self.classification_base_model,
+            self.classification_base_model_arguments,
+            step=('classification t=%d_%d' % (fold, number_of_times)))
+
+        # store model, predict
+        self.models[fold]['classification'][number_of_times] = model_classification
+        y_predict_classification = model_classification.predict(np_X_classification)
+        y_probabilities_classification = model_classification.predict_proba(np_X_classification)
+
+        models = (model_detection, model_gram, model_classification)
+        predictions = (y_predict_detection, y_predict_gram, y_predict_classification)
+        probabilities = (y_probabilities_detection, y_probabilities_gram, y_probabilities_classification)
+
+        return models, predictions, probabilities
 
     # 6) PREDICT #
+    def predict(self, models, X_test, fold, t, use_last_timestep_results):
+        number_of_times = t
+        (model_detection, model_gram, model_classification) = models
+        (X_test_detection, X_test_gram, X_test_classification) = X_test
 
-    # 7) SCORE #
+        if self.verbose:
+            ptf( 'Predicting detection fold:%d, nt:%d ...' % (fold, number_of_times), self.logfile)
+
+        if use_last_timestep_results:
+            # append most recent probabilities of growth (col 1)
+            np_X_detection = np.hstack((X_test_detection,
+                self.fold_probabilities_test[fold]['detection'][:,1].reshape(-1,1)))
+        else:
+            np_X_detection = X_test_detection
+
+        y_predict_detection = model_detection.predict(np_X_detection)
+        y_probabilities_detection = model_detection.predict_proba(np_X_detection)
+
+        # predict gram
+        if self.verbose:
+            ptf( 'Predciting gram fold:%d, nt=%d ...' % (fold, number_of_times), self.logfile)
+
+        np_X_gram = np.hstack((X_test_gram,
+            y_probabilities_detection[:,1].reshape(-1,1)))
+        if use_last_timestep_results:
+            # append probas of n, p (not control)
+            np_X_gram = np.hstack((np_X_gram,
+                self.fold_probabilities_test[fold]['gram'][:,:2]))
+
+        y_predict_gram = model_gram.predict(np_X_gram)
+        y_probabilities_gram = model_gram.predict_proba(np_X_gram)
+
+        # predict classification
+        if self.verbose:
+            ptf( 'Predicting classification fold:%d, nt=%d ...' % (fold, number_of_times), self.logfile)
+
+        np_X_classification = np.hstack((X_test_classification,
+            y_probabilities_detection[:,1].reshape(-1,1),
+            y_probabilities_gram[:,:-1]))
+
+        if use_last_timestep_results:
+            # append probas of all non-control classes
+            np_X_classification = np.hstack((np_X_classification,
+                self.probabilities[fold]['classification'][:,1:]))
+
+        y_predict_classification = model_classification.predict(np_X_classification)
+        y_probabilities_classification = model_classification.predict_proba(np_X_classification)
+
+        predictions = (y_predict_detection, y_predict_gram, y_predict_classification)
+        probabilities = (y_probabilities_detection, y_probabilities_gram, y_probabilities_classification)
+
+        return predictions, probabilities
+
+    # 7) STORE #
+
+    # 8) SCORE #
 
     ### HELPER METHODS ###
 
@@ -353,9 +474,9 @@ class SeriesModel(object):
 
     # 6) PREDICT #
 
-    # 7) SCORE #
+    # 7) STORE #
 
-
+    # 8) SCORE #
 
     ## one_timestep methods ##
 
@@ -404,51 +525,7 @@ class SeriesModel(object):
         X_test_train = X_test_train[self.folds[fold][test_train]]
         return X_test_train
 
-    def _subset_fold_y_class(self, y, fold, test_train, result_type):
-        y_test_train = y.iloc[self.folds[fold][test_train]][result_type].values
-        return y_test_train
-
-    def _subset_fold_y_testtrain(self, y, fold, test_train):
-        yd = self._subset_fold_y_class(self, y, fold, test_train, result_type='detection')
-        yg = self._subset_fold_y_class(self, y, fold, test_train, result_type='gram')
-        yc = self._subset_fold_y_class(self, y, fold, test_train, result_type='classification')
-
-        return (yd, yg, yc)
-
-    def _subset_fold_y(self, y, fold):
-        yt = self._subset_fold_y_testtrain(y, fold, test_train = 'test')
-        yp = self._subset_fold_y_testtrain(y, fold, test_train = 'train')
-
-        return (yt, yp)
-
-    def _subset_fold_X_class(self, X, fold, test_train, result_type):
-        if test_train == 'train':
-            X_test_train = self.fold_features[fold][result_type][t]
-        else:
-            X_test_train = self.fold_features_test[fold][result_type][t]
-        return X_test_train
-
-    def _subset_fold_X_testtrain(self, X, fold, test_train):
-        Xd = self._subset_fold_X_class(self, y, fold, test_train, result_type='detection')
-        Xg = self._subset_fold_X_class(self, y, fold, test_train, result_type='gram')
-        Xc = self._subset_fold_X_class(self, y, fold, test_train, result_type='classification')
-
-        return (Xd, Xg, Xc)
-
-    def _subset_fold_X(self, X, fold):
-        X_train = self._subset_fold_X_testtrain(y, fold, test_train = 'test')
-        X_test = self._subset_fold_X_testtrain(y, fold, test_train = 'train')
-
-        return (X_train, X_test)
-
-    def _accumulate_results(result_dict, results):
-        (rd, rg, rc) = results
-
-        result_dict['detection'].extend(rc)
-        result_dict['gram'].extend(rg)
-        result_dict['classification'].extend(rc)
-
-    def _scale_one_timestep(self, X_train, number_of_times, fold):
+    def _scale_one_timestep(self, X, number_of_times, fold):
         start = time.time()
 
         # pick just the data we need for this fold
@@ -538,9 +615,9 @@ class SeriesModel(object):
         if self.verbose:
             ptf('... %d seconds' % (end-start))
 
-        X_reduceds = [(X_detection_reduced, X_test_detection_reduced),
-            (X_gram_reduced, X_test_gram_reduced),
-            (X_classification_reduced, X_test_classification_reduced)]
+        X_reduceds = [(X_detection_reduced, X_detection_test_reduced),
+            (X_gram_reduced, X_gram_test_reduced),
+            (X_classification_reduced, X_classification_test_reduced)]
         return X_reduceds
 
     # 4) PICKLE/LOAD FEATURES #
@@ -549,7 +626,123 @@ class SeriesModel(object):
 
     # 6) PREDICT #
 
-    # 7) SCORE #
+    # 7) STORE #
+    def _store_one_fold(self, train, test, fold, t):
+        results_dict = {}
+        results_dict['time'] = t
+        results_dict['fold'] = fold
+        labels_types = ['detection', 'gram', 'classification']
+        testtrain_types = ['test', 'train']
+        for testtrain, testtrain_type in izip((test, train), testtrain_types):
+            (predictions, probabilities) = testtrain
+
+            for class_predictions, class_probabilities, label_type in izip(predictions, probabilities, labels_types):
+                results_dict[testtrain_type + '_' + label_type + '_' + 'predictions'] = class_predictions
+                results_dict[testtrain_type + '_' + label_type + '_' + 'probabilities'] = class_probabilities
+
+        self._append_row_to_df(self.results, results_dict)
+
+        # update fold predicitions and probabilities
+        for testtrain, testtrain_type in izip((test, train), testtrain_types):
+            (predictions, probabilities) = testtrain
+
+            for class_predictions, class_probabilities, label_type in izip(predictions, probabilities, labels_types):
+                if testtrain_type == 'train':
+                    self.fold_predictions[fold][label_type] = class_predictions
+                    self.fold_probabilities[fold][label_type] = class_predictions
+                else:
+                    self.fold_predictions_test[fold][label_type] = class_predictions
+                    self.fold_probabilities_test[fold][label_type] = class_predictions
+
+    # 8) SCORE #
+    #
+    # def _score_one_timestep(self, y, y_predict_detection,
+    #                          y_predict_gram, y_predict_classification,
+    #                          number_of_times, fold):
+    def _score_one_timestep(self, results_dicts, number_of_times):
+        (y_train_true_timestep,
+            y_train_predict_timestep,
+            y_test_true_timestep,
+            y_test_predict_timestep) = results_dicts
+
+        # [y_train_detection, y_train_gram, y_train_classification] = y
+        # detection - calculate results
+        ytp_pairs = ((y_train_true_timestep, y_train_predict_timestep),
+            (y_train_true_timestep, y_train_predict_timestep))
+        for (yt,yp), testtrain_type in izip(ytp_pairs, ['train', 'test']):
+            y_train_detection = yt['detection']
+            y_train_gram = yt['gram']
+            y_train_classification = yt['classification']
+            y_predict_detection = yp['detection']
+            y_predict_gram = yp['gram']
+            y_predict_classification = yp['classification']
+
+            if self.verbose:
+                # print np.unique(y_predict_detection)
+                # print np.unique(y_train_detection)
+                # print self.confusion_labels['detection']
+                ptf( '%s Detection results' % testtrain_type, self.logfile)
+                ptf( mcm.classification_report_ovr(y_train_detection,
+                    y_predict_detection,
+                    self.confusion_labels['detection']), self.logfile)
+                ptf( '%s Gram results' % testtrain_type, self.logfile)
+                ptf( mcm.classification_report_ovr(y_train_gram,
+                    y_predict_gram,
+                    self.confusion_labels['gram']), self.logfile)
+                ptf( '%s Classification results' % testtrain_type, self.logfile)
+                ptf( mcm.classification_report_ovr(y_train_classification,
+                    y_predict_classification,
+                    self.confusion_labels['classification'], s1=30), self.logfile)
+
+            scores = mcm.scores_binary(y_train_detection, y_predict_detection)
+            # print scores
+            # builds confusion matrix of TP, FP, etc. for the detection case
+            cm = mcm.confusion_matrix_binary(y_train_detection, y_predict_detection)
+            # print cm
+            # detection - populate scores
+            score_dict = self._populate_score_dict(cm, scores, number_of_times)
+            # self.scores['detection'] = self.scores['detection'].append(score_dict, ignore_index=True)
+
+            # figure out how to append one set of scores
+            if testtrain_type == 'train':
+                self._append_row_to_df(self.scores['detection'], score_dict)
+            else:
+                self._append_row_to_df(self.scores_test['detection'], score_dict)
+
+
+            # gram, classification - calculate and populate results
+            for result_type, predictions, truths in izip(['gram', 'classification'],
+                    [y_predict_gram, y_predict_classification],
+                    [y_train_gram, y_train_classification]):
+                labels = list(self.confusion_labels[result_type])
+                cm = mcm.confusion_matrix_mc(truths, predictions, labels)
+                results = mcm.results_ovr(truths, predictions, labels)
+                scores = mcm.scores_ovr(truths, predictions, labels)
+                micros, macros = mcm.micro_macro_scores(results)
+
+                # add results for each label
+                for i, label in enumerate(labels):
+                    label_cm = mcm.confusion_matrix_ovr(*results[i,:])
+                    score_dict = self._populate_score_dict(label_cm, scores[i,:], number_of_times)
+                    # self.scores[result_type][label].append(score_dict, ignore_index=True)
+                    if testtrain_type == 'train':
+                        self._append_row_to_df(self.scores[result_type][label], score_dict)
+                    else:
+                        self._append_row_to_df(self.scores_test[result_type][label], score_dict)
+
+                score_dict = self._populate_score_dict(cm, micros, number_of_times)
+                score_dict = self._populate_score_dict(cm, macros, number_of_times)
+
+                if testtrain_type == 'train':
+                    # self.scores[result_type]['micro'].append(score_dict, ignore_index=True)
+                    self._append_row_to_df(self.scores[result_type]['micro'], score_dict)
+
+                    # self.scores[result_type]['macro'].append(score_dict, ignore_index=True)
+                    self._append_row_to_df(self.scores[result_type]['macro'], score_dict)
+                else:
+                    self._append_row_to_df(self.scores_test[result_type]['micro'], score_dict)
+                    self._append_row_to_df(self.scores_test[result_type]['macro'], score_dict)
+
 
     ## one_class methods ##
 
@@ -620,8 +813,25 @@ class SeriesModel(object):
     # 5) TRAIN #
 
     # 6) PREDICT #
+    def _fit_class(self, X_train, y_train, model_type, model_argmuents, step=None):
+        if model_type == 'LR':
+            model = LogisticRegression(**model_argmuents)
+        elif model_type == 'RF':
+            pass
+        elif model_type == 'SVM':
+            pass
+        elif model_type == 'longitudinal':
+            pass
+        else:
+            print 'Invalid model_type %s for %s' % (model_type, step)
 
-    # 7) SCORE #
+        model.fit(X_train, y_train)
+
+        return model
+
+    # 7) STORE #
+
+    # 8) SCORE #
 
     ### SET-UP METHODS ###
 
@@ -663,19 +873,25 @@ class SeriesModel(object):
 
         # for all of our metrics, build a pandas dataframe column
         self.scores = {}
+        self.scores_test = {}
         df_columns = ['time']
         self.metrics = ['confusion_matrix', 'accuracy', 'precision', 'recall', 'f1']
         df_columns.extend(self.metrics)
         for label, label_list in self.confusion_labels.iteritems():
             if label == 'detection':
                 self.scores[label] = pd.DataFrame(columns=df_columns)
+                self.scores_test[label] = pd.DataFrame(columns=df_columns)
             else:
                 self.scores[label] = {}
+                self.scores_test[label] = {}
                 # print label_list
                 for k in label_list:
                     self.scores[label][k] = pd.DataFrame(columns=df_columns)
+                    self.scores_test[label][k] = pd.DataFrame(columns=df_columns)
                 self.scores[label]['micro'] = pd.DataFrame(columns=df_columns)
                 self.scores[label]['macro'] = pd.DataFrame(columns=df_columns)
+                self.scores_test[label]['micro'] = pd.DataFrame(columns=df_columns)
+                self.scores_test[label]['macro'] = pd.DataFrame(columns=df_columns)
 
 
     # i. SETUP #
@@ -701,6 +917,13 @@ class SeriesModel(object):
         self.folds = defaultdict(dict)
         self.fold_probabilities = defaultdict(dict)
         self.fold_probabilities_test = defaultdict(dict)
+        self.fold_predictions = defaultdict(dict)
+        self.fold_predictions_test = defaultdict(dict)
+
+        self.models = defaultdict(dict)
+        self.scalers = defaultdict(dict)
+        self.reducers = defaultdict(dict)
+
         sss = StratifiedShuffleSplit(y=y['classification'],
                 n_iter=self.nfolds,
                 test_size=self.fold_size,
@@ -724,17 +947,36 @@ class SeriesModel(object):
                 'detection':defaultdict(dict),
                 'gram':defaultdict(dict),
                 'classification': defaultdict(dict)}
+            self.models[i] = {
+                'detection':defaultdict(dict),
+                'gram':defaultdict(dict),
+                'classification': defaultdict(dict)}
 
-            self.fold_probabilites[i] = {}
-            self.fold_probabilites_test[i] = {}
+            self.fold_probabilities[i] = {}
+            self.fold_probabilities_test[i] = {}
             for k, v in self.confusion_labels.iteritems():
                 self.fold_probabilities[i][k] = np.zeros((len(train_index), len(v)))
-                self.fold_probabilities_test[i][k] = np.zeros((len(train_index), len(v)))
+                self.fold_probabilities_test[i][k] = np.zeros((len(test_index), len(v)))
+                self.fold_predictions[i][k] = np.zeros(len(train_index))
+                self.fold_predictions_test[i][k] = np.zeros(len(test_index))
 
 
     ### UTILITY METHODS ###
+    def _subset_data(self, Z, number_of_times):
+        z_sub = Z.copy()
+        z_sub= z_sub.apply(lambda x: x[0:number_of_times])
+        return z_sub
 
+    def _populate_score_dict(self, cm, results, number_of_times):
+        score_dict = {}
+        score_dict['time'] = number_of_times
+        score_dict['confusion_matrix'] = cm
+        score_dict['accuracy'] = results[0]
+        score_dict['precision'] = results[1]
+        score_dict['recall'] = results[2]
+        score_dict['f1'] = results[3]
 
+        return score_dict
     def _get_fold(self, X, fold, time):
         X_detection_train = X[fold]['detection'][train]
         X_detection_test = X[fold]['detection'][test]
@@ -744,10 +986,6 @@ class SeriesModel(object):
         X_classification_test = X[fold]['classification'][test]
 
         return (X_detection_train, X_detection_test, X_gram_train, X_gram_test, X_classification_train, X_classification_test)
-
-    np_X_detection, np_X_gram, np_X_classification = X['detection'][number_of_times], X['gram'][number_of_times], X_classification['number_of_times']
-
-
 
     def _pandas_to_numpy(self, df_X):
         # features are in a pandas dataframe of the format
@@ -815,6 +1053,53 @@ class SeriesModel(object):
     def _rgb_to_hsv(self, X):
         return X
 
+    # Workhorse helper methods #
+    def _subset_fold_y_class(self, y, fold, test_train, result_type):
+        y_test_train = y.iloc[self.folds[fold][test_train]][result_type].values
+        return y_test_train
+
+    def _subset_fold_y_testtrain(self, y, fold, test_train):
+        yd = self._subset_fold_y_class(y, fold, test_train, result_type='detection')
+        yg = self._subset_fold_y_class(y, fold, test_train, result_type='gram')
+        yc = self._subset_fold_y_class(y, fold, test_train, result_type='classification')
+
+        return (yd, yg, yc)
+
+    def _subset_fold_y(self, y, fold):
+        ytest = self._subset_fold_y_testtrain(y, fold, test_train = 'test')
+        ytrain = self._subset_fold_y_testtrain(y, fold, test_train = 'train')
+
+        return (ytrain, ytest)
+
+    def _subset_fold_X_class(self, fold, test_train, result_type, t):
+        # print fold, test_train, result_type, t
+        if test_train == 'train':
+            X_test_train = self.fold_features[fold][result_type][t]
+        else:
+            X_test_train = self.fold_features_test[fold][result_type][t]
+        return X_test_train
+
+    def _subset_fold_X_testtrain(self, fold, test_train, t):
+        # print fold, test_train, t
+        Xd = self._subset_fold_X_class(fold, test_train, result_type = 'detection', t=t)
+        Xg = self._subset_fold_X_class(fold, test_train, result_type = 'gram', t=t)
+        Xc = self._subset_fold_X_class(fold, test_train, result_type = 'classification', t=t)
+
+        return (Xd, Xg, Xc)
+
+    def _subset_fold_X(self, fold, t):
+        X_train = self._subset_fold_X_testtrain(fold, test_train = 'train', t=t)
+        X_test = self._subset_fold_X_testtrain(fold, test_train = 'test', t=t)
+
+        return (X_train, X_test)
+
+    def _accumulate_results(self, result_dict, results):
+        (rd, rg, rc) = results
+
+        result_dict['detection'].extend(rd)
+        result_dict['gram'].extend(rg)
+        result_dict['classification'].extend(rc)
+
 
     ### DEPRECATED METHODS ###
     def _prepare_data(self, X):
@@ -831,7 +1116,15 @@ class SeriesModel(object):
     # def __repr__(self):
     #     print self
 
+    def bayes_update(self,t):
+        # use Bayesian prior/posterior ideas to update predictions, probabilities
+        # based on most recent timestep
+        pass
 
+
+
+
+    #### WORKHORSE METHOD ####
     def fit(self, X, y, verbose=False, debug=False):
         self.verbose = verbose
         self.debug = debug
@@ -854,40 +1147,53 @@ class SeriesModel(object):
             return
 
         # generate all features or load all features
-        if self.featurizers_coldstart:
-            # All trials
+        if self.featurizer_coldstart:
+            # 0) PREPROCESS All trials
             X_preprocessed = self.preprocess(X)
-            # step by timestep
+            # 1) FEATURIZE - step by timestep
             X_featurized = self.featurize(X_preprocessed, self.featurizer_pickle)
 
             # 1A) PICKLE FEATURES #
             start = time.time()
-            ptf('\n>> 1A. Pickling features to %s' % self.features_pickle, self.logfile)
+            ptf('\n>> 1A. Pickling features to %s ...' % self.features_pickle, self.logfile)
             self.pickle_features(X_featurized, self.features_pickle)
             end = time.time()
             ptf('\n>> Pickling completed (%s seconds) <<' % (end-start), self.logfile)
 
         else:
-            X = self.load_features(self.features_pickle)
-            self.features = X
+            start = time.time()
+            ptf('\n>> 1. Loading features from %s ...' % self.features_pickle, self.logfile)
+
+            X_featurized = self.load_features(self.features_pickle)
+            self.features = X_featurized
+            end = time.time()
+            ptf('\n>> Loading completed (%s seconds) <<' % (end-start), self.logfile)
 
 
-        if self.scaler_coldstart or self.reducer_colstart:
-            # step by timestep and by fold
+        if self.scaler_coldstart or self.reducer_coldstart:
+            # 2) SCALE - step by timestep and by fold
             X_scaled = self.scale(X_featurized, self.scaler_pickle)
+            # 3) REDUCE - step by timestep and by fold
             X_reduced = self.reduce(X_scaled, self.reducer_pickle)
 
             start = time.time()
-            ptf('\n>> 5. Pickling final features to %s' % self.fold_features_pickle, self.logfile)
+            ptf('\n>> 4A. Pickling final features to %s, %s' % (self.fold_features_pickle, self.fold_features_test_pickle), self.logfile)
             self.pickle_features(X_reduced, self.fold_features_pickle)
             self.pickle_features(self.fold_features_test, self.fold_features_test_pickle)
             ptf('\n>> Pickling completed (%s seconds) <<' % (end-start), self.logfile)
 
         else:
+            ptf('\n>> 1-4A. Loading fold_features from %s ...' % self.fold_features_pickle, self.logfile)
             X = self.load_features(self.fold_features_pickle)
             self.fold_features = X
+            Xt = self.load_features(self.fold_features_test_pickle)
+            self.fold_features_test = Xt
 
         # Now we fit
+        ptf('\n\n>> 5. Training, 6. Predicting, 7. Scoring and 8. Storing ... \n\n', self.logfile)
+        fitstart = time.time()
+
+        use_last_timestep_results = False # don't use for first timestep
         for t in self.times:
             start = time.time()
 
@@ -899,7 +1205,7 @@ class SeriesModel(object):
             y_test_true_timestep = defaultdict(list)
             y_test_predict_timestep = defaultdict(list)
 
-            result_dicts = (
+            results_dicts = (
                 y_train_true_timestep,
                 y_train_predict_timestep,
                 y_test_true_timestep,
@@ -907,7 +1213,7 @@ class SeriesModel(object):
 
             for fold, fold_indexes in self.folds.iteritems():
                 # get Xd, Xg, Xc for this fold and timestep
-                (X_train, X_test) = self._subset_fold_x(fold, t)
+                (X_train, X_test) = self._subset_fold_X(fold, t)
 
                 # X_train_detection = self.fold_features[fold]['detection'][t]
                 # X_train_gram = self.fold_features[fold]['gram'][t]
@@ -915,7 +1221,6 @@ class SeriesModel(object):
 
                 # get yd, yg, yc for this fold and timestep
                 (y_train, y_test) = self._subset_fold_y(y, fold)
-
 
                 # y_train_detection = self._subset_fold_y(y, fold, 'detection')
                 # y_train_gram = self._subset_fold_y(y, fold, 'gram')
@@ -925,14 +1230,14 @@ class SeriesModel(object):
                 # y = [y_train_detection, y_train_gram, y_train_classification]
 
                 # train on Xtrain fold features
-                models, train_predictions, train_probabilities = self.train(X_train, y_train, fold, t)
+                # 5) TRAIN
+                models, train_predictions, train_probabilities = self.train(X_train, y_train, fold, t, use_last_timestep_results)
+                # 6) PREDICT
+                test_predictions, test_probabilities = self.predict(models, X_test, fold, t, use_last_timestep_results)
 
-
-                test_predictions, test_probabilities = self.predict(models, X_test, fold, t)
-
-                (model_detection, model_gram, model_classification) = models
-                (y_train_predictions_detection, y_train_predictions_gram, y_train_predictions_classification) = train_predictions
-                (y_train_probabilities_detection, y_train_probabilities_gram, y_train_probabilities_classification) = train_probabilities
+                # (model_detection, model_gram, model_classification) = models
+                # (y_train_predictions_detection, y_train_predictions_gram, y_train_predictions_classification) = train_predictions
+                # (y_train_probabilities_detection, y_train_probabilities_gram, y_train_probabilities_classification) = train_probabilities
 
                 # accumulate y_pred_train, y_true_train
                 results = (
@@ -940,608 +1245,37 @@ class SeriesModel(object):
                     train_predictions,
                     y_test,
                     test_predictions)
-                for result_dict, result in izip(result_dicts, results):
+                for result_dict, result in izip(results_dicts, results):
                     self._accumulate_results(result_dict, result)
 
+                # 7) STORE
                 self._store_one_fold(
                     (train_predictions, train_probabilities),
                     (test_predictions, test_probabilities),
                     fold,
                     t)
-                # y_train_pred_detection = model_detection.predict(self.fold_features_test[fold]['detection'][t])
-                # y_train_pred_gram = model_gram.predict(self.fold_features_test[fold]['gram'][t])
-                # y_train_pred_classification = model_classification.predict(self.fold_features_test[fold]['classification'][t])
 
-
-            self._score_one_timestep(y, y_predict_detection,
-                                     y_predict_gram, y_predict_classification,
-                                     number_of_times, fold)
-
-
-
-                # predict on Xtest by
-                # scale fold data
-                # reduce fold data
-                # predict fold data
-                X_test_detection = self.fold_features_test[fold]['detection'][t]
-                X_test_gram = self.fold_features_test[fold]['gram'][t]
-                X_test_classification = self.fold_features_test[fold]['classification'][t]
-
-                # accumulate y_pred_test, y_true_test
-
-
-
-                X_train = self.fold_features[fold]
-                X_detection_train, X_detection_test, X_gram_train, X_gram_test, X_classification_train, X_classification_test
-                self._fit_one_timestep(X, y, t, use_last_timestep_results)
-                use_last_timestep_results = self.use_last_timestep_results
-
-
+            # 8) SCORE
+            self._score_one_timestep(results_dicts, t)
+            use_last_timestep_results = self.use_last_timestep_results
 
             # Bayes update
             # if not self.use_last_timestep_results:
             #     self.bayes_update(t)
 
             end = time.time()
-            if True:
-                ptf( '\n----TIMESTEP %d took %d seconds----\n\n' % (t, (end-start)), self.logfile)
-
-
-
-
-
-    def predict(self, models, X_test, fold, t):
-        number_of_times = t
-        (model_detection, model_gram, model_classification) = models
-        (X_test_detection, X_test_gram, X_test_classification) = X_test
-
-        if self.verbose:
-            ptf( 'Predicting detection fold:%d, nt:%d ...' % (fold, number_of_times), self.logfile)
-
-        if use_last_timestep_results:
-            # append most recent probabilities of growth (col 1)
-            np_X_detection = np.hstack((X_test_detection,
-                self.fold_probabilities_test[fold]['detection'][:,1].reshape(-1,1)))
-
-        y_predict_detection = model_detection.predict(np_X_detection)
-        y_probabilities_detection = model_detection.predict_proba(np_X_detection)
-
-        # predict gram
-        if self.verbose:
-            ptf( 'Predciting gram fold:%d, nt=%d ...' % (fold, number_of_times), self.logfile)
-
-        np_X_gram = np.hstack((X_test_gram,
-            y_probabilities_detection[:,1].reshape(-1,1)))
-        if use_last_timestep_results:
-            # append probas of n, p (not control)
-            np_X_gram = np.hstack((np_X_gram,
-                self.fold_probabilities_test[fold]['gram'][:,:2]))
-
-        y_predict_gram = model_gram.predict(np_X_gram)
-        y_probabilities_gram = model_gram.predict_proba(np_X_gram)
-
-        # predict classification
-        if self.verbose:
-            ptf( 'Training classification fold:%d, nt=%d ...' % (fold, number_of_times), self.logfile)
-
-        np_X_classification = np.hstack((X_classification_test,
-            y_probabilities_detection[:,1].reshape(-1,1),
-            y_probabilities_gram[:,:-1]))
-
-        if use_last_timestep_results:
-            # append probas of all non-control classes
-            np_X_classification = np.hstack((np_X_classification,
-                self.probabilities[fold]['classification'][:,1:]))
-
-        y_predict_classification = model_classification.predict(np_X_classification)
-        y_probabilities_classification = model_classification.predict_proba(np_X_classification)
-
-        predictions = (y_predict_detection, y_predict_gram, y_predict_classification)
-        probabilities = (y_probabilities_detection, y_probabilities_gram, y_probabilities_classification)
-
-        return predicitons, probabilities
-
-    def train(self, X, y, fold, t):
-        number_of_times = t
-        (X_train_detection, X_train_gram, X_train_classification) = X
-        (y_train_detection, y_train_gram, y_train_classification) = y
-
-        # fit detection
-        if self.verbose:
-            ptf( 'Training detection fold:%d, nt:%d ...' % (fold, number_of_times), self.logfile)
-
-        if use_last_timestep_results:
-            # append most recent probabilities of growth (col 1)
-            np_X_detection = np.hstack((X_train_detection,
-                self.fold_probabilities[fold]['detection'][:,1].reshape(-1,1)))
-
-        model_detection = self._fit_class(np_X_detection,
-            y_train_detection,
-            self.detection_base_model,
-            self.detection_base_model_arguments,
-            step=('detection t=%d_%d' % (fold,number_of_times)))
-
-        # store model, predict
-        self.models[fold]['detection'][number_of_times] = model_detection
-        y_predict_detection = model_detection.predict(np_X_detection)
-        y_probabilities_detection = model_detection.predict_proba(np_X_detection)
-
-        # fit gram
-        if self.verbose:
-            ptf( 'Training gram fold:%d, nt=%d ...' % (fold, number_of_times), self.logfile)
-
-        np_X_gram = np.hstack((X_train_gram,
-            y_probabilities_detection[:,1].reshape(-1,1)))
-        if use_last_timestep_results:
-            # append probas of n, p (not control)
-            np_X_gram = np.hstack((np_X_gram,
-                self.fold_probabilities[fold]['gram'][:,:2]))
-
-        model_gram = self._fit_class(np_X_gram,
-            y_gram_detection,
-            self.gram_base_model,
-            self.gram_base_model_arguments,
-            step=('gram t=%d_%d' % (fold, number_of_times)))
-
-        # store model, predict
-        self.models[fold]['gram'][number_of_times] = model_gram
-        y_predict_gram = model_gram.predict(np_X_gram)
-        y_probabilities_gram = model_gram.predict_proba(np_X_gram)
-
-        # fit classification
-        if self.verbose:
-            ptf( 'Training classification fold:%d, nt=%d ...' % (fold, number_of_times), self.logfile)
-
-        np_X_classification = np.hstack((X_classification_train,
-            y_probabilities_detection[:,1].reshape(-1,1),
-            y_probabilities_gram[:,:-1]))
-
-        if use_last_timestep_results:
-            # append probas of all non-control classes
-            np_X_classification = np.hstack((np_X_classification,
-                self.fold_probabilities[fold]['classification'][:,1:]))
-
-        model_classification = self._fit_class(np_X_classification,
-            y_classification_detection,
-            self.classification_base_model,
-            self.classification_base_model_arguments,
-            step=('classification t=%d_%d' % (fold, number_of_times)))
-
-        # store model, predict
-        self.models[fold]['classification'][number_of_times] = model_classification
-        y_predict_classification = model_classification.predict(np_X_classification)
-        y_probabilities_classification = model_classification.predict_proba(np_X_classification)
-
-        models = (model_detection, model_gram, model_classification)
-        predictions = (y_predict_detection, y_predict_gram, y_predict_classification)
-        probabilities = (y_probabilities_detection, y_probabilities_gram, y_probabilities_classification)
-
-        return models, predictions, probabilities
-
-
-        # score and write to scores
-        self._score_one_timestep(y, y_predict_detection,
-                                 y_predict_gram, y_predict_classification,
-                                 number_of_times, fold)
-        # store results from this timestep
-        self._store_one_timestep((y_predict_detection, y_probabilities_detection),
-                                 (y_predict_gram, y_probabilities_gram),
-                                 (y_predict_classification, y_probabilities_classification),
-                                 number_of_times, fold)
-
-    def _train_one_timestep(self, t):
-        y_train_pred = defaultdict(list)
-        y_train_true = defaultdict(list)
-
-
-
-
-
-    def bayes_update(self,t):
-        # use Bayesian prior/posterior ideas to update predictions, probabilities
-        # based on most recent timestep
-        pass
-
-
-
-
-
-
-
-
-    def _predict_featurize_class(self, X, featurizer):
-        X_features, scores = featurizer.fit_transform(X)
-        # print X_features.head()
-
-        # need to flatten the features
-        X_flat = X_features.apply(lambda x: x.flatten())
-        return X_features
-
-    # def _featurize_gram(self, X_train):
-    #     # featurizer = PolynomialFeaturizer()
-    #     if self.detection_featurizer == 'poly':
-    #         featurizer = PolynomialFeaturizer()
-    #     X_gram = featurizer(X_train)
-    #     return X_gram
-    #
-    # def _featurize_classification(self, X_train):
-    #     # featurizer = PolynomialFeaturizer()
-    #     X_classification = self.classification_featurizer(X_train)
-    #     return X_classification
-
-
-
-
-
-
-
-    def _fit_class(self, X_train, y_train, model_type, model_argmuents, step=None):
-        if model_type == 'LR':
-            model = LogisticRegression(**model_argmuents)
-        elif model_type == 'RF':
-            pass
-        elif model_type == 'SVM':
-            pass
-        elif model_type == 'longitudinal':
-            pass
-        else:
-            print 'Invalid model_type %s for %s' % (model_type, step)
-
-        model.fit(X_train, y_train)
-
-        return model
-
-
-
-    def _fit_one_timestep(self, X, y, number_of_times, use_last_timestep_results=False):
-        #
-        np_X_detection, np_X_gram, np_X_classification = X['detection'][number_of_times], X['gram'][number_of_times], X_classification['number_of_times']
-        np_X_detection = self._pandas_to_numpy(X_detection)
-        if use_last_timestep_results:
-            # append most recent probabilities of growth (col 1)
-            np_X_detection = np.hstack((np_X_detection,
-                                        self.probabilities['detection'][:,1].reshape(-1,1)))
-        # fit detection
-        ptf( 'Training detection nt=%d ...' % number_of_times, self.logfile)
-        # detection_model = self.fit_detection(X_detection, y['detection'])
-        # print type(X), type(X_train), type(X_detection), type(np_X_detection)
-        # print X.shape, X_train.shape, X_detection.shape, np_X_detection.shape
-        # #print X_detection.shape, X_gram.shape, X_classification.shape
-        # print type(y)
-        # print y.shape
-        detection_model = self._fit_class(np_X_detection,
-                                y['detection'].values,
-                                self.detection_base_model,
-                                self.detection_base_model_arguments,
-                                step=('detection t=%d' % number_of_times))
-
-        # store model
-        self.models['detection'][number_of_times] = detection_model
-
-        # predict detection and probabilities.
-        # Use as features to fit gram
-        y_predict_detection = detection_model.predict(np_X_detection)
-        y_probabilities_detection = detection_model.predict_proba(np_X_detection)
-
-        # fit gram
-        ptf( 'Training gram nt=%d ...' % number_of_times, self.logfile)
-        np_X_gram = self._pandas_to_numpy(X_gram)
-        # print np_X_gram.shape
-        # print y_predict_detection.shape
-        # print y_probabilities_detection.shape
-        # print y_probabilities_detection[:,1].shape
-        np_X_gram = np.hstack((np_X_gram, y_probabilities_detection[:,1].reshape(-1,1)))
-        if use_last_timestep_results:
-            # append probas of n, p (not control)
-            np_X_gram = np.hstack((np_X_gram, self.probabilities['gram'][:,:2]))
-        gram_model = self._fit_class(np_X_gram,
-                                y['gram'].values,
-                                self.gram_base_model,
-                                self.gram_base_model_arguments,
-                                step=('gram t=%d' % number_of_times))
-
-        # store model
-        self.models['gram'][number_of_times] = gram_model
-
-        # predict gram and probabilities.
-        # Use as features to fit classification
-        y_predict_gram = gram_model.predict(np_X_gram)
-        y_probabilities_gram = gram_model.predict_proba(np_X_gram)
-
-        # fit classification
-        ptf( 'Training classification nt=%d ...' % number_of_times, self.logfile)
-        np_X_classification = self._pandas_to_numpy(X_classification)
-        # print np_X_classification.shape
-        # print y_probabilities_detection[:,1].reshape(-1,1).shape
-        # print y_probabilities_gram[:,:2].shape
-        np_X_classification = np.hstack((np_X_classification,
-                            y_probabilities_detection[:,1].reshape(-1,1),
-                            y_probabilities_gram[:,:-1]))
-        if use_last_timestep_results:
-            np_X_classification = np.hstack((np_X_classification,
-                                        self.probabilities['classification'][:,:-1]))
-        # classification_model = self.fit_classification(np_X_classification, y['classification'])
-        classification_model = self._fit_class(np_X_classification, y['classification'],
-                                self.classification_base_model,
-                                self.classification_base_model_arguments,
-                                step=('classification t=%d' % number_of_times))
-
-        # store model
-        self.models['classification'][number_of_times] = classification_model
-
-        y_predict_classification = classification_model.predict(np_X_classification)
-        y_probabilities_classification = classification_model.predict_proba(np_X_classification)
-
-        # score and write to scores
-        self._score_one_timestep(y, y_predict_detection,
-                                 y_predict_gram, y_predict_classification,
-                                 number_of_times)
-        # store results from this timestep
-        self._store_one_timestep((y_predict_detection, y_probabilities_detection),
-                                 (y_predict_gram, y_probabilities_gram),
-                                 (y_predict_classification, y_probabilities_classification),
-                                 number_of_times)
-
-    def _subset_data(self, Z, number_of_times):
-        z_sub = Z.copy()
-        z_sub= z_sub.apply(lambda x: x[0:number_of_times])
-        return z_sub
-
-    def _featurize_detection(self, X_train):
-        pass
-
-    def _featurize_gram(self, X_train):
-        pass
-
-    def _featurize_classification(self, X_train):
-        pass
-
-    def predict_proba(self, X, verbose=False):
-        yd, yg, yc = self.predict(X, verbose)
-
-        return self.probabilities['detection'], self.probabilities['gram'], self.probabilities['classification']
-
-
-    def predict(self, X, verbose=False):
-        self.verbose = verbose
-
-        # preprocesses X via manner used to fit
-        # also creates scores, results, predictions and probabilities df
-        # NOTE: this overwrites the existing df created during the fit step
-        X = self._prepare_data(X)
-
-        if self.max_time > self.trial_lengths.min():
-            print '***FIT ERROR***'
-            print 'Minimum trial_length, %s, is less than max_time, %s' % (self.trial_lengths.min(), self.max_time)
-            return
-
-        # step thru timesteps, featurizers, preprocessors, models and predicts
-        use_last_timestep_results = False
-        for t in self.times:
-            start = time.time()
-
-            self._predict_one_timestep(X,t,use_last_timestep_results)
-            use_last_timestep_results = self.use_last_timestep_results
-
-            # Bayes update
-            if not self.use_last_timestep_results:
-                self.bayes_update(t)
-
-            end = time.time()
             if self.verbose:
-                ptf( '\n----PREDICT TIMESTEP %d took %d seconds----\n\n' % (t, (end-start)), self.logfile)
+                ptf( '\n----TIMESTEP %d took %d seconds----\n\n' % (t, (end-start)), self.logfile)
+        fitend = time.time()
+        ptf('\n\n>> 5. Training, 6. Predicting, 7. Scoring and 8. Storing completed <<', self.logfile)
+        ptf('%d seconds (%0.1f mins) for:\tTrials:%d, Folds:%d, Times:%d\n\n' %
+                ((fitend-fitstart),
+                (fitend-fitstart)/60.0,
+                len(X),
+                self.nfolds,
+                len(self.times)),
+            self.logfile)
 
-        return self.predictions['detection'], self.predictions['gram'], self.predictions['classification']
-
-
-    def _predict_one_timestep(self, X, number_of_times, use_last_timestep_results=False):
-        # subset the data
-        X = self._subset_data(X, number_of_times)
-
-        # featurize
-        X_detection, X_gram, X_classification = self._predict_featurize(X, number_of_times)
-
-        # predict detection
-        ptf( 'Predicting detection nt=%d ...' % number_of_times, self.logfile)
-        np_X_detection = self._pandas_to_numpy(X_detection)
-
-        # use last timestep if required
-        if use_last_timestep_results:
-            # append most recent probabilities of growth (col 1)
-            np_X_detection = np.hstack((np_X_detection,
-                                        self.probabilities['detection'][:,1].reshape(-1,1)))
-
-        # predict detection
-        detection_model = self.models['detection'][number_of_times]
-        y_predict_detection = detection_model.predict(np_X_detection)
-        y_probabilities_detection = detection_model.predict_proba(np_X_detection)
-
-        # predict gram
-        ptf( 'Predicting gram nt=%d ...' % number_of_times, self.logfile)
-        np_X_gram = self._pandas_to_numpy(X_gram)
-        np_X_gram = np.hstack((np_X_gram, y_probabilities_detection[:,1].reshape(-1,1)))
-
-        if use_last_timestep_results:
-            # append probas of n, p (not control)
-            np_X_gram = np.hstack((np_X_gram, self.probabilities['gram'][:,:2]))
-
-        gram_model = self.models['gram'][number_of_times]
-        y_predict_gram = gram_model.predict(np_X_gram)
-        y_probabilities_gram = gram_model.predict_proba(np_X_gram)
-
-        # fit classification
-        ptf( 'Training classification nt=%d ...' % number_of_times, self.logfile)
-        np_X_classification = self._pandas_to_numpy(X_classification)
-        np_X_classification = np.hstack((np_X_classification,
-                            y_probabilities_detection[:,1].reshape(-1,1),
-                            y_probabilities_gram[:,:-1]))
-        if use_last_timestep_results:
-            np_X_classification = np.hstack((np_X_classification,
-                                        self.probabilities['classification'][:,:-1]))
-
-        classification_model = self.models['classification'][number_of_times]
-
-        y_predict_classification = classification_model.predict(np_X_classification)
-        y_probabilities_classification = classification_model.predict_proba(np_X_classification)
-
-        # store results from this timestep
-        self._store_one_timestep((y_predict_detection, y_probabilities_detection),
-                                 (y_predict_gram, y_probabilities_gram),
-                                 (y_predict_classification, y_probabilities_classification),
-                                 number_of_times)
-
-
-    def _predict_featurize(self, X, number_of_times):
-        detection_featurizer = self.featurizers['detection'][number_of_times]
-        X_detection = self._predict_featurize_class(X, detection_featurizer)
-
-        if self.gram_base_featurizer == 'detection':
-            X_gram = X_detection.copy()
-        else:
-            gram_featurizer = self.featurizers['gram'][number_of_times]
-            X_gram = self._predict_featurize_class(X, gram_featurizer)
-
-        if self.classification_base_featurizer == 'detection':
-            X_classification = X_detection.copy()
-        elif self.classification_base_featurizer == 'gram':
-            X_classification = X_gram.copy()
-        else:
-            classification_featurizer = self.featurizers['classification'][number_of_times]
-            X_classification = self._predict_featurize_class(X, classification_featurizer)
-
-        return X_detection, X_gram, X_classification
-
-
-
-
-
-    def score(self, y, verbose=False):
-        # NOTE - scores at each time-step
-        # must follow a fit or predict step
-        self.verbose = verbose
-
-        for t in self.times:
-            y_predict_detection = self._get_column_value_by_time(self.results, 'detection_predictions', t)
-            y_predict_gram = self._get_column_value_by_time(self.results, 'gram_predictions', t)
-            y_predict_classification = self._get_column_value_by_time(self.results, 'classification_predictions', t)
-
-            y_probabilities_detection = self._get_column_value_by_time(self.results, 'detection_probabilities', t)
-            y_probabilities_gram = self._get_column_value_by_time(self.results, 'gram_probabilities', t)
-            y_probabilities_classification = self._get_column_value_by_time(self.results, 'classification_probabilities', t)
-
-            # score and write to scores
-            self._score_one_timestep(y, y_predict_detection,
-                                     y_predict_gram, y_predict_classification,
-                                     t)
-
-            # store results from this timestep
-            self._store_one_timestep((y_predict_detection, y_probabilities_detection),
-                                     (y_predict_gram, y_probabilities_gram),
-                                     (y_predict_classification, y_probabilities_classification),
-                                     t)
-        return self.results
-
-    def _populate_score_dict(self, cm, results, number_of_times):
-        score_dict = {}
-        score_dict['time'] = number_of_times
-        score_dict['confusion_matrix'] = cm
-        score_dict['accuracy'] = results[0]
-        score_dict['precision'] = results[1]
-        score_dict['recall'] = results[2]
-        score_dict['f1'] = results[3]
-
-        return score_dict
-
-
-    def _store_one_fold(train, test, fold, t):
-        results_dict = {}
-        results_dict['time'] = t
-        results_dict['fold'] = fold
-        labels_types = ['detection', 'gram', 'classification']
-        testtrain_types = ['test', 'train']
-        for testtrain, testtrain_type in izip((test, train), testtrain_types):
-            (predictions, probabilities) = testtrain
-
-            for class_predictions, class_probabilities, label_type in izip(predictions, probabilities, labels_types):
-                results_dict[testtrain_type + '_' + label_type + '_' + 'predictions'] = class_predictions
-                results_dict[testtrain_type + '_' + label_type + '_' + 'probabilities'] = class_probabilities
-
-        self._append_row_to_df(self.results, results_dict)
-
-
-    # ==> DEPRECATED <== #
-    def _store_one_timestep(self, detection_tuple, gram_tuple, classification_tuple, number_of_times):
-        results_dict = {}
-        results_dict['time'] = number_of_times
-
-        # update results data_frame
-        results_tuples = [detection_tuple, gram_tuple, classification_tuple]
-        results_types = ['detection', 'gram', 'classification']
-        for (predictions, probabilities), results_type in izip(results_tuples, results_types):
-            results_dict[results_type + '_' + 'predictions'] = predictions
-            results_dict[results_type + '_' + 'probabilities'] = probabilities
-
-        self._append_row_to_df(self.results, results_dict)
-
-        # update predictions and probabilities
-        results_tuples = [detection_tuple, gram_tuple, classification_tuple]
-        results_types = ['detection', 'gram', 'classification']
-        for (predictions, probabilities), results_type in izip(results_tuples, results_types):
-            self.predictions[results_type] = predictions
-            self.probabilities[results_type] = probabilities
-
-    def _score_one_timestep(self, y, y_predict_detection,
-                             y_predict_gram, y_predict_classification,
-                             number_of_times, fold):
-        [y_train_detection, y_train_gram, y_train_classification] = y
-        # detection - calculate results
-        if self.verbose:
-            ptf( 'Detection results', self.logfile)
-            ptf( mcm.classification_report_ovr(y_train_detection,
-                y_predict_detection,
-                self.confusion_labels['detection']), self.logfile)
-            ptf( 'Gram results', self.logfile)
-            ptf( mcm.classification_report_ovr(y_train_gram,
-                y_predict_gram,
-                self.confusion_labels['gram']), self.logfile)
-            ptf( 'Classification results', self.logfile)
-            ptf( mcm.classification_report_ovr(y_train_classification,
-                y_predict_classification,
-                self.confusion_labels['classification'], s1=30), self.logfile)
-
-        scores = mcm.scores_binary(y_train_detection, y_predict_detection)
-        # print scores
-        # builds confusion matrix of TP, FP, etc. for the detection case
-        cm = mcm.confusion_matrix_binary(y_train_detection, y_predict_detection)
-        # print cm
-        # detection - populate scores
-        score_dict = self._populate_score_dict(cm, scores, number_of_times)
-        # self.scores['detection'] = self.scores['detection'].append(score_dict, ignore_index=True)
-
-        # figure out how to append one set of scores
-        self._append_row_to_df(self.scores['detection'], score_dict)
-
-        # gram, classification - calculate and populate results
-        for result_type, predictions in izip(['gram', 'classification'],[y_predict_gram, y_predict_classification]):
-            labels = list(self.confusion_labels[result_type])
-            cm = mcm.confusion_matrix_mc(y_train[result_type], predictions, labels)
-            results = mcm.results_ovr(y_train[result_type], predictions, labels)
-            scores = mcm.scores_ovr(y_train[result_type], predictions, labels)
-            micros, macros = mcm.micro_macro_scores(results)
-
-            # add results for each label
-            for i, label in enumerate(labels):
-                label_cm = mcm.confusion_matrix_ovr(*results[i,:])
-                score_dict = self._populate_score_dict(label_cm, scores[i,:], number_of_times)
-                # self.scores[result_type][label].append(score_dict, ignore_index=True)
-                self._append_row_to_df(self.scores[result_type][label], score_dict)
-
-            score_dict = self._populate_score_dict(cm, micros, number_of_times)
-            # self.scores[result_type]['micro'].append(score_dict, ignore_index=True)
-            self._append_row_to_df(self.scores[result_type]['micro'], score_dict)
-            score_dict = self._populate_score_dict(cm, macros, number_of_times)
-            # self.scores[result_type]['macro'].append(score_dict, ignore_index=True)
-            self._append_row_to_df(self.scores[result_type]['macro'], score_dict)
 
 
 
