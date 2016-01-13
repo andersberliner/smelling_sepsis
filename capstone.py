@@ -118,6 +118,7 @@ if __name__ == '__main__':
 
 
     sm = SeriesModel(
+        featurizer_coldstart = False,
         logfile = None,
         use_last_timestep_results = use_last_timestep_results,
         color_scale = 'RGB',

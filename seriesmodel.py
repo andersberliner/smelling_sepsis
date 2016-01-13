@@ -27,6 +27,7 @@ class SeriesModel(object):
                     min_time = 1, # time after ref_time to start fitting
                     use_last_timestep_results = False, # True for simple, False do to Bayesian approach
                     features_pickle = 'features.pkl',
+                    fold_features_pickle = 'fold_features.pkl',
                     featurizer_pickle = 'featurizer.pkl',
                     featurizer_coldstart = True,
                     reducer_pickle = 'reducer.pkl',
@@ -41,13 +42,13 @@ class SeriesModel(object):
                     detection_featurizer_arguments={},
                     gram_model='LR',
                     gram_model_arguments={},
-                    gram_reducer='PCA',
+                    gram_reducer='pca',
                     gram_reducer_arguments={},
                     gram_featurizer='detection',
                     gram_featurizer_arguments={},
                     classification_model='LR',
                     classification_model_arguments={},
-                    classification_reducer='PCA',
+                    classification_reducer='pca',
                     classification_reducer_arguments={},
                     classification_featurizer='gram',
                     classification_featurizer_arguments={},
@@ -202,22 +203,11 @@ class SeriesModel(object):
     # 2) SCALE #
     def scale(self, X, scaler_pickle):
         start = time.time()
-        ptf('\n>> 2. Scaling data...', self.logfile)
-        for t in self.times:
-            # featurize, storing featurizers at each timestep
-            number_of_times = t
-            if self.verbose:
-                ptf( 'Scaling nt=%d ...' % number_of_times, self.logfile)
-            np_X_detection, np_X_gram, np_X_classification = self._scale_one_timestep(X, t)
-
-            if self.debug:
-                print 'Checking scaled shapes', np_X_detection.shape, np_X_gram.shape, np_X_classification.shape
-
-            # store scaled features
-            self.features['detection'][t] = np_X_detection
-            self.features['gram'][t] = np_X_gram
-            self.features['classification'][t] = np_X_classification
-
+        ptf('\n>> 2. Scaling data ...', self.logfile)
+        for fold, index_dict in self.folds.iteritems():
+            # select only X_train
+            # X_train = X
+            self._scale_one_fold(X, fold)
         end = time.time()
         ptf('\n>> Scaling completed (%s seconds) <<' % (end-start), self.logfile)
 
@@ -232,31 +222,16 @@ class SeriesModel(object):
         end = time.time()
         ptf('\n>> Pickling completed (%s seconds) <<' % (end-start), self.logfile)
 
-        return self.features
+        return self.fold_features
 
     # 3) REDUCE #
     def reduce(self, X, reducer_pickle):
+        # pickle reducers
         start = time.time()
         ptf('\n>> 3. Reducing data ...', self.logfile)
-        for t in self.times:
-            number_of_times = t
-            # featurize, storing featurizers at each timestep
-            if self.verbose:
-                ptf( 'Reducing nt=%d ...' % number_of_times, self.logfile)
-            np_X_detection, np_X_gram, np_X_classification = self._reduce_one_timestep(X, t)
+        for fold in self.folds.keys():
+            self._reduce_one_fold(X, fold)
 
-            if self.debug:
-                print 'Checking reduced shapes', np_X_detection.shape, np_X_gram.shape, np_X_classification.shape
-
-            # store reduced features
-            self.features['detection'][t] = np_X_detection
-            self.features['gram'][t] = np_X_gram
-            self.features['classification'][t] = np_X_classification
-
-        end = time.time()
-        ptf('\n>> Reducing completed (%s seconds) <<' % (end-start), self.logfile)
-
-        # pickle reducers
         start = time.time()
         reducer_file_name = reducer_pickle
         reducer_file = open(reducer_file_name, 'wb')
@@ -267,22 +242,120 @@ class SeriesModel(object):
         end = time.time()
         ptf('\n>> Pickling completed (%s seconds) <<' % (end-start), self.logfile)
 
-        return self.features
+        return self.fold_features
 
-    # 4) PICKLE FEATURES #
-    def pickle_features(self, features_pickle):
+    # 4) PICKLE/LOAD FEATURES #
+    def pickle_features(self, data, features_pickle):
         # pickle features
-        start = time.time()
         features_file_name = features_pickle
         features_file = open(features_file_name, 'wb')
-        ptf('\n>> 4. Pickling featurizers to %s' % features_file_name, self.logfile)
-        pickle.dump(sm, features_file, -1)
+        pickle.dump(data, features_file, -1)
         features_file.close()
+
+    def load_features(self, features_pickle):
+        features_file_name = features_pickle
+        features_file = open(features_file_name, 'rb')
+        data = pickle.load(features_file)
+        features_file.close()
+        return data
+
+    # 5) TRAIN #
+    def train(self, X, y):
+        # pickle reducers
+        start = time.time()
+        ptf('\n>> 3. Training data ...', self.logfile)
+        for fold in self.folds.keys():
+            self._reduce_one_fold(X, fold)
+
+        start = time.time()
+        reducer_file_name = reducer_pickle
+        reducer_file = open(reducer_file_name, 'wb')
+        ptf('\n>> Pickling reducers to %s' % reducer_file_name, self.logfile)
+        pickle.dump(self.reducers, reducer_file, -1)
+        reducer_file.close()
 
         end = time.time()
         ptf('\n>> Pickling completed (%s seconds) <<' % (end-start), self.logfile)
 
+        return self.fold_features
+
+    # 6) PREDICT #
+
+    # 7) SCORE #
+
     ### HELPER METHODS ###
+
+    ## one_fold methods ##
+
+    # 1) FEATURIZE #
+
+    # 2) SCALE #
+    def _scale_one_fold(self, X, fold):
+        start = time.time()
+        if self.verbose:
+            ptf('\n> Scaling fold %d ...' % fold, self.logfile)
+
+        for t in self.times:
+            # featurize, storing featurizers at each timestep
+            number_of_times = t
+            if self.verbose:
+                ptf( 'Scaling nt=%d ...' % number_of_times, self.logfile)
+            np_X_detection, np_X_gram, np_X_classification = self._scale_one_timestep(X, t, fold)
+
+            if self.debug:
+                print 'Checking scaled shapes', np_X_detection[0].shape, np_X_gram[0].shape, np_X_classification[0].shape
+
+            # store scaled features
+            self.fold_features[fold]['detection'][t] = np_X_detection[0]
+            self.fold_features[fold]['gram'][t] = np_X_gram[0]
+            self.fold_features[fold]['classification'][t] = np_X_classification[0]
+
+            self.fold_features_test[fold]['detection'][t] = np_X_detection[1]
+            self.fold_features_test[fold]['gram'][t] = np_X_gram[1]
+            self.fold_features_test[fold]['classification'][t] = np_X_classification[1]
+
+        end = time.time()
+
+        if self.verbose:
+            ptf('\n> Scaling fold %d completed (%s seconds) <<' % (fold,(end-start)), self.logfile)
+
+    # 3) REDUCE #
+    def _reduce_one_fold(self, X, fold):
+        start = time.time()
+        if self.verbose:
+            ptf('\n> Reducing fold %d ...' % fold, self.logfile)
+        for t in self.times:
+            number_of_times = t
+            # featurize, storing featurizers at each timestep
+            if self.verbose:
+                ptf( 'Reducing nt=%d ...' % number_of_times, self.logfile)
+            np_X_detection, np_X_gram, np_X_classification = self._reduce_one_timestep(X[fold], t, fold)
+
+            if self.debug:
+                print 'Checking reduced shapes', np_X_detection[0].shape, np_X_gram[0].shape, np_X_classification[0].shape
+
+            # store reduced features
+            self.fold_features[fold]['detection'][t] = np_X_detection[0]
+            self.fold_features[fold]['gram'][t] = np_X_gram[0]
+            self.fold_features[fold]['classification'][t] = np_X_classification[0]
+
+            self.fold_features_test[fold]['detection'][t] = np_X_detection[1]
+            self.fold_features_test[fold]['gram'][t] = np_X_gram[1]
+            self.fold_features_test[fold]['classification'][t] = np_X_classification[1]
+
+        end = time.time()
+        if self.verbose:
+            ptf('\n> Reducing fold %d completed (%s seconds) <<' % (fold,(end-start)), self.logfile)
+
+    # 4) PICKLE/LOAD FEATURES #
+
+    # 5) TRAIN #
+
+    # 6) PREDICT #
+
+    # 7) SCORE #
+
+
 
     ## one_timestep methods ##
 
@@ -326,67 +399,117 @@ class SeriesModel(object):
         return X_detection, X_gram, X_classification
 
     # 2) SCALE #
-    def _scale_one_timestep(self, X_train, number_of_times):
+    def _subset_fold(self, X, fold, result_type, number_of_times, test_train='train'):
+        X_test_train = X[result_type][number_of_times]
+        X_test_train = X_test_train[self.folds[fold][test_train]]
+        return X_test_train
+
+    def _subset_fold_y(self, y, fold, result_type, test_train='train'):
+        y_test_train = y.iloc[self.folds[fold][test_train]][result_type].values
+        return y_test_train
+
+    def _scale_one_timestep(self, X_train, number_of_times, fold):
         start = time.time()
+
+        # pick just the data we need for this fold
+
+        # X_train_detection = X_train['detection'][number_of_times]
+        # X_train_detection = X_train_detection[self.folds[fold]['train']]
+
         # detection
-        X_detection_scaled, detection_scaler = self._scale_class(X_train['detection'][number_of_times])
-        self.scalers['detection'][number_of_times] = detection_scaler
+        X_train_detection = self._subset_fold(X, fold, 'detection', number_of_times, 'train')
+        X_detection_scaled, detection_scaler = self._scale_class(X_train_detection)
+        self.scalers[fold]['detection'][number_of_times] = detection_scaler
+
+        X_test_detection = self._subset_fold(X, fold, 'detection', number_of_times, 'test')
+        X_test_detection_scaled = detection_scaler.transform(X_test_detection)
 
         # gram
-        X_gram_scaled, gram_scaler = self._scale_class(X_train['gram'][number_of_times])
-        self.scalers['gram'][number_of_times] = gram_scaler
+        X_train_gram = self._subset_fold(X, fold, 'gram', number_of_times, 'train')
+        X_gram_scaled, gram_scaler = self._scale_class(X_train_gram)
+        self.scalers[fold]['gram'][number_of_times] = gram_scaler
+
+        X_test_gram = self._subset_fold(X, fold, 'gram', number_of_times, 'test')
+        X_test_gram_scaled = gram_scaler.transform(X_test_gram)
 
         # classification
-        X_classification_scaled, classification_scaler = self._scale_class(X_train['classification'][number_of_times])
-        self.scalers['classification'][number_of_times] = classification_scaler
+        X_train_classification = self._subset_fold(X, fold, 'classification', number_of_times, 'train')
+        X_classification_scaled, classification_scaler = self._scale_class(X_train_classification)
+        self.scalers[fold]['classification'][number_of_times] = classification_scaler
+
+        X_test_classification = self._subset_fold(X, fold, 'classification', number_of_times, 'test')
+        X_test_classification_scaled = classification_scaler.transform(X_test_classification)
 
         end = time.time()
         if self.verbose:
             ptf('... %d seconds' % (end-start))
-        return X_detection_scaled, X_gram_scaled, X_classification_scaled
+
+        X_scaleds = [(X_detection_scaled, X_test_detection_scaled),
+            (X_gram_scaled, X_test_gram_scaled),
+            (X_classification_scaled, X_test_classification_scaled)]
+        return X_scaleds
 
     # 3) REDUCE #
-    def _reduce_one_timestep(self, X_train, number_of_times):
+    def _reduce_one_timestep(self, X_train, number_of_times, fold):
         start = time.time()
         # detection
         X_detection_reduced, detection_reducer = self._reduce_class(
                 X_train['detection'][number_of_times],
                 self.detection_base_reducer,
                 self.detection_base_reducer_arguments)
-        self.reducers['detection'][number_of_times] = detection_reducer
+        self.reducers[fold]['detection'][number_of_times] = detection_reducer
 
+        X_detection_test = self.fold_features_test[fold]['detection'][number_of_times]
+        X_detection_test_reduced = detection_reducer.transform(X_detection_test)
         # for efficiency, if not using different methods, could have
         # all 3 be the same
         # gram
         if self.gram_base_reducer == 'detection':
-            X_gram = X_detection.copy()
+            X_gram_reduced = X_detection_reduced.copy()
             gram_reducer = detection_reducer
         else:
             X_gram_reduced, gram_reducer = self._reduce_class(
                     X_train['gram'][number_of_times],
                     self.gram_base_reducer,
                     self.gram_base_reducer_arguments)
-        self.reducers['gram'][number_of_times] = gram_reducer
+        self.reducers[fold]['gram'][number_of_times] = gram_reducer
+
+        X_gram_test = self.fold_features_test[fold]['gram'][number_of_times]
+        X_gram_test_reduced = gram_reducer.transform(X_gram_test)
 
         # classification
         if self.classification_base_reducer == 'detection':
-            X_classification = X_detection.copy()
+            X_classification_reduced = X_detection_reduced.copy()
             classification_reducer = detection_reducer
         elif self.classification_base_reducer == 'gram':
-            X_classification = X_gram.copy()
+            X_classification_reduced = X_gram_reduced.copy()
             classification_reducer = gram_reducer
         else:
             X_classification_reduced, classification_reducer = self._reduce_class(
                     X_train['classification'][number_of_times],
                     self.classification_base_reducer,
                     self.classification_base_reducer_arguments)
-        self.reducers['classification'][number_of_times] = classification_reducer
+        self.reducers[fold]['classification'][number_of_times] = classification_reducer
+
+        X_classification_test = self.fold_features_test[fold]['classification'][number_of_times]
+        X_classification_test_reduced = classification_reducer.transform(X_classification_test)
 
         end = time.time()
         if self.verbose:
             ptf('... %d seconds' % (end-start))
 
-        return X_detection, X_gram, X_classification
+        X_reduceds = [(X_detection_reduced, X_test_detection_reduced),
+            (X_gram_reduced, X_test_gram_reduced),
+            (X_classification_reduced, X_test_classification_reduced)]
+        return X_reduceds
+
+    # 4) PICKLE/LOAD FEATURES #
+
+    # 5) TRAIN #
+
+    # 6) PREDICT #
+
+    # 7) SCORE #
 
     ## one_class methods ##
 
@@ -432,6 +555,7 @@ class SeriesModel(object):
     # 2) SCALE #
     def _scale_class(self, X):
         ss = StandardScaler()
+        X = X.copy()
         X_scaled = ss.fit_transform(X)
 
         return X_scaled, ss
@@ -449,9 +573,15 @@ class SeriesModel(object):
 
         X_features = reducer.fit_transform(X_train)
 
-        return X_features, featurizer
+        return X_features, reducer
 
+    # 4) PICKLE/LOAD FEATURES #
 
+    # 5) TRAIN #
+
+    # 6) PREDICT #
+
+    # 7) SCORE #
 
     ### SET-UP METHODS ###
 
@@ -523,15 +653,49 @@ class SeriesModel(object):
         return confusion_labels
 
     def _build_crossvalidation_folds(self, y):
+        self.fold_features = defaultdict(dict)
+        self.fold_features_test = defaultdict(dict)
         self.folds = defaultdict(dict)
         sss = StratifiedShuffleSplit(y=y['classification'],
                 n_iter=self.nfolds,
                 test_size=self.fold_size,
                 random_state=1)
-        for train_index, test_index in sss:
+        for i, (train_index, test_index) in enumerate(sss):
             self.folds[i] = {'train': train_index, 'test': test_index}
+            # fold_features[fold][result_type][time] => np_array of features
+            self.fold_features[i] = {
+                'detection':defaultdict(dict),
+                'gram':defaultdict(dict),
+                'classification': defaultdict(dict)}
+            self.fold_features_test[i] = {
+                'detection':defaultdict(dict),
+                'gram':defaultdict(dict),
+                'classification': defaultdict(dict)}
+            self.scalers[i] = {
+                'detection':defaultdict(dict),
+                'gram':defaultdict(dict),
+                'classification': defaultdict(dict)}
+            self.reducers[i] = {
+                'detection':defaultdict(dict),
+                'gram':defaultdict(dict),
+                'classification': defaultdict(dict)}
 
     ### UTILITY METHODS ###
+
+
+    def _get_fold(self, X, fold, time):
+        X_detection_train = X[fold]['detection'][train]
+        X_detection_test = X[fold]['detection'][test]
+        X_gram_train = X[fold]['gram'][train]
+        X_gram_test = X[fold]['gram'][test]
+        X_classification_train = X[fold]['classification'][train]
+        X_classification_test = X[fold]['classification'][test]
+
+        return (X_detection_train, X_detection_test, X_gram_train, X_gram_test, X_classification_train, X_classification_test)
+
+    np_X_detection, np_X_gram, np_X_classification = X['detection'][number_of_times], X['gram'][number_of_times], X_classification['number_of_times']
+
+
 
     def _pandas_to_numpy(self, df_X):
         # features are in a pandas dataframe of the format
@@ -639,30 +803,91 @@ class SeriesModel(object):
 
         # generate all features or load all features
         if self.featurizers_coldstart:
+            # All trials
             X_preprocessed = self.preprocess(X)
+            # step by timestep
             X_featurized = self.featurize(X_preprocessed, self.featurizer_pickle)
 
-            # do something about cross_validation
-            for fold in self.folds.keys():
-                X_scaled = self.scale(X_featurized, self.scaler_pickle, fold)
-                X_reduced = self.reduce(X_scaled, self.reducer_pickle, fold)
-                self.pickle_features(X_reduced, self.features_pickle, fold)
+            # 1A) PICKLE FEATURES #
+            start = time.time()
+            ptf('\n>> 1A. Pickling features to %s' % self.features_pickle, self.logfile)
+            self.pickle_features(X_featurized, self.features_pickle)
+            end = time.time()
+            ptf('\n>> Pickling completed (%s seconds) <<' % (end-start), self.logfile)
+
         else:
             X = self.load_features(self.features_pickle)
+            self.features = X
 
 
+        if self.scaler_coldstart or self.reducer_colstart:
+            # step by timestep and by fold
+            X_scaled = self.scale(X_featurized, self.scaler_pickle)
+            X_reduced = self.reduce(X_scaled, self.reducer_pickle)
 
+            start = time.time()
+            ptf('\n>> 5. Pickling final features to %s' % self.fold_features_pickle, self.logfile)
+            self.pickle_features(X_reduced, self.fold_features_pickle)
+            self.pickle_features(self.fold_features_test, self.fold_features_test_pickle)
+            ptf('\n>> Pickling completed (%s seconds) <<' % (end-start), self.logfile)
+
+        else:
+            X = self.load_features(self.fold_features_pickle)
+            self.fold_features = X
+
+        # Now we fit
         for t in self.times:
             start = time.time()
 
             if self.verbose:
                 ptf( '\n\nTIMESTEP %d...' % t, self.logfile)
-            self._fit_one_timestep(X, y, t, use_last_timestep_results)
-            use_last_timestep_results = self.use_last_timestep_results
+
+            for fold, fold_indexes in self.folds.iteritems():
+                # get Xd, Xg, Xc for this fold and timestep
+                X_train_detection = self.fold_features[fold]['detection'][t]
+                X_train_gram = self.fold_features[fold]['gram'][t]
+                X_train_classification = self.fold_features[fold]['classification'][t]
+                # get yd, yg, yc for this fold and timestep
+                y_train_detection = self._subset_fold_y(y, fold, 'detection')
+                y_train_gram = self._subset_fold_y(y, fold, 'gram')
+                y_train_classification = self._subset_fold_y(y, fold, 'classification')
+
+                X = [X_train_detection, X_train_gram, X_train_classification]
+                y = [y_train_detection, y_train_gram, y_train_classification]
+                # train on Xtrain fold features
+                models, train_predictions = self.train(X, y, fold, t)
+                (model_detection, model_gram, model_classification) = models
+                (y_train_predictions_detection, y_train_predictions_gram, y_train_predictions_classification) = train_predictions
+                # accumulate y_pred_train, y_true_train
+                # y_train_pred_detection = model_detection.predict(self.fold_features_test[fold]['detection'][t])
+                # y_train_pred_gram = model_gram.predict(self.fold_features_test[fold]['gram'][t])
+                # y_train_pred_classification = model_classification.predict(self.fold_features_test[fold]['classification'][t])
+
+
+
+
+                # predict on Xtest by
+                # scale fold data
+                # reduce fold data
+                # predict fold data
+                X_test_detection = self.fold_features_test[fold]['detection'][t]
+                X_test_gram = self.fold_features_test[fold]['gram'][t]
+                X_test_classification = self.fold_features_test[fold]['classification'][t]
+
+                # accumulate y_pred_test, y_true_test
+
+
+
+                X_train = self.fold_features[fold]
+                X_detection_train, X_detection_test, X_gram_train, X_gram_test, X_classification_train, X_classification_test
+                self._fit_one_timestep(X, y, t, use_last_timestep_results)
+                use_last_timestep_results = self.use_last_timestep_results
+
+
 
             # Bayes update
-            if not self.use_last_timestep_results:
-                self.bayes_update(t)
+            # if not self.use_last_timestep_results:
+            #     self.bayes_update(t)
 
             end = time.time()
             if True:
@@ -675,8 +900,19 @@ class SeriesModel(object):
 
 
 
+    def train(self):
+        for t in self.times:
+            y_train_true, y_train_pred = self._train_one_timestep(t)
+
+            y_test_pred = self._predict_one_timestep(t)
+
+            self._score_one_timestep(y_train_pred, t,  train=True)
+            self._score_one_timestep(y_test_pred, t)
 
 
+    def _train_one_timestep(self, t):
+        y_train_pred = defaultdict(list)
+        y_train_true = defaultdict(list)
 
 
 
@@ -739,12 +975,8 @@ class SeriesModel(object):
 
 
     def _fit_one_timestep(self, X, y, number_of_times, use_last_timestep_results=False):
-        # subset the data
-        X_train = self._subset_data(X, number_of_times)
-
-        # featurize
-        ptf( 'Featurizing nt=%d ...' % number_of_times, self.logfile)
-        X_detection, X_gram, X_classification = self._featurize(X_train, number_of_times)
+        #
+        np_X_detection, np_X_gram, np_X_classification = X['detection'][number_of_times], X['gram'][number_of_times], X_classification['number_of_times']
         np_X_detection = self._pandas_to_numpy(X_detection)
         if use_last_timestep_results:
             # append most recent probabilities of growth (col 1)
