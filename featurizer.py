@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from itertools import izip
 import time
-from utils_capstone import print_to_file_and_terminal as ptf
+from output_capstone import print_to_file_and_terminal as ptf
 
 class PolynomialFeaturizer(object):
     def __init__(self, n=4, reference_time=0, verbose=True, logfile=None):

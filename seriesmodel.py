@@ -6,14 +6,16 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
+from sklearn.cross_validation import StratifiedShuffleSplit
 from itertools import izip
 from collections import defaultdict
 from featurizer import PolynomialFeaturizer
 import multiclassmetrics as mcm
 import time
 from functools import partial
+import pickle
 
-from utils_capstone import print_to_file_and_terminal as ptf
+from output_capstone import print_to_file_and_terminal as ptf
 
 class SeriesModel(object):
     def __init__(self, logfile=None,
@@ -48,34 +50,45 @@ class SeriesModel(object):
                     classification_reducer='PCA',
                     classification_reducer_arguments={},
                     classification_featurizer='gram',
-                    classification_featurizer_arguments={}):
+                    classification_featurizer_arguments={},
+                    nfolds=1,
+                    fold_size=0.1):
         self.X = X
         self.y = y
 
         self.logfile = logfile
 
+        # preprocessing parameters
         self.color_scale = color_scale
         self.color_vector_type = color_vector_type
         self.reference_time = reference_time
         self.max_time = max_time
         self.min_time = min_time
 
+        # fit conditions
         self.use_last_timestep_results = use_last_timestep_results
+        self.nfolds = nfolds
+        self.fold_size = 0.1
+
+        # data storage conditions
         self.featurizer_pickle = featurizer_pickle
         self.featurizer_coldstart = featurizer_coldstart
         self.reducer_pickle = reducer_pickle
         self.reducer_coldstart = reducer_coldstart
+        self.scaler_pickle = scaler_pickle
+        self.scaler_coldstart = scaler_coldstart
 
+        # other run conditions
         self.verbose = False
         self.trial_lengths = None
-        self.number_of_columns = 220 # expected number of spots and colors
+        self.number_of_columns = 220 # expected number of spots and colors + time
 
         # self.models is a group of models for detection, gram, classification
         # at each timepoint
         self.features = defaultdict(dict) # 10: [[np X n]]
         self.models = defaultdict(dict)
         self.featurizers = defaultdict(dict)
-        self.scalers = default(dict)
+        self.scalers = defaultdict(dict)
         self.reducers = defaultdict(dict)
         self.times = []
 
@@ -106,10 +119,23 @@ class SeriesModel(object):
 
     ### MAIN METHODS ###
 
+    # i) SETUP #
+    def setup(self, X, y):
+        start = time.time()
+        ptf('\n>> i. Setting-up SeriesModel ...', self.logfile)
+        self.confusion_labels = self._build_confusion_labels(y)
+        self._build_results_dataframes(len(X))
+        self.trial_lengths = self.find_trial_lengths(X)
+        self.inspect_trial_shapes(X)
+        self._build_crossvalidation_folds(y)
+
+        end = time.time()
+        ptf('\n>> Set-up completed (%s seconds) <<' % (end-start), self.logfile)
+
     # 0) PREPROCESS #
     def preprocess(self, X):
         start = time.time()
-        ptf('\n>> Preprocessing data...', self.logfile)
+        ptf('\n>> 0. Preprocessing data ...', self.logfile)
 
         X = X.copy()
         reference_time = self.reference_time
@@ -132,14 +158,19 @@ class SeriesModel(object):
     # 1) FEATURIZE #
     def featurize(self, X, featurizer_pickle):
         start = time.time()
-        ptf('\n>> Featurizing data ...', self.logfile)
-        for t in self.times():
+        ptf('\n>> 1. Featurizing data ...', self.logfile)
+        for t in self.times:
+            number_of_times = t
             # featurize, storing featurizers at each timestep
             if self.verbose:
                 ptf( 'Featurizing nt=%d ...' % number_of_times, self.logfile)
-            X_train = self._subset_data(X, number_of_times)
-            X_detection, X_gram, X_classification = self._featurize_one_timestep(X_train, t)
 
+            X_train = self._subset_data(X, number_of_times)
+            if self.debug:
+                print t, X.iloc[0].shape
+            X_detection, X_gram, X_classification = self._featurize_one_timestep(X_train, t)
+            if self.debug:
+                print t, X_detection.iloc[0].shape, X_gram.iloc[0].shape, X_classification.iloc[0].shape
             # convert to numpy arrays
             np_X_detection = self._pandas_to_numpy(X_detection)
             np_X_gram = self._pandas_to_numpy(X_gram)
@@ -171,9 +202,10 @@ class SeriesModel(object):
     # 2) SCALE #
     def scale(self, X, scaler_pickle):
         start = time.time()
-        ptf('\n>> Scaling data...', self.logfile)
-        for t in self.times():
+        ptf('\n>> 2. Scaling data...', self.logfile)
+        for t in self.times:
             # featurize, storing featurizers at each timestep
+            number_of_times = t
             if self.verbose:
                 ptf( 'Scaling nt=%d ...' % number_of_times, self.logfile)
             np_X_detection, np_X_gram, np_X_classification = self._scale_one_timestep(X, t)
@@ -205,8 +237,9 @@ class SeriesModel(object):
     # 3) REDUCE #
     def reduce(self, X, reducer_pickle):
         start = time.time()
-        ptf('\n>> Featurizing data ...', self.logfile)
-        for t in self.times():
+        ptf('\n>> 3. Reducing data ...', self.logfile)
+        for t in self.times:
+            number_of_times = t
             # featurize, storing featurizers at each timestep
             if self.verbose:
                 ptf( 'Reducing nt=%d ...' % number_of_times, self.logfile)
@@ -236,13 +269,13 @@ class SeriesModel(object):
 
         return self.features
 
-    # PICKLE FEATURES #
+    # 4) PICKLE FEATURES #
     def pickle_features(self, features_pickle):
         # pickle features
         start = time.time()
         features_file_name = features_pickle
         features_file = open(features_file_name, 'wb')
-        ptf('\n>> Pickling featurizers to %s' % features_file_name, self.logfile)
+        ptf('\n>> 4. Pickling featurizers to %s' % features_file_name, self.logfile)
         pickle.dump(sm, features_file, -1)
         features_file.close()
 
@@ -289,7 +322,7 @@ class SeriesModel(object):
 
         end = time.time()
         if self.verbose:
-            ptf('... %d seconds' % (end-time))
+            ptf('... %d seconds' % (end-start))
         return X_detection, X_gram, X_classification
 
     # 2) SCALE #
@@ -309,17 +342,19 @@ class SeriesModel(object):
 
         end = time.time()
         if self.verbose:
-            ptf('... %d seconds' % (end-time))
+            ptf('... %d seconds' % (end-start))
         return X_detection_scaled, X_gram_scaled, X_classification_scaled
 
     # 3) REDUCE #
     def _reduce_one_timestep(self, X_train, number_of_times):
         start = time.time()
         # detection
-        X_detection, detection_reducer = self._reduce_class(X_train,
-                                self.detection_base_reducer,
-                                self.detection_base_reducer_arguments)
+        X_detection_reduced, detection_reducer = self._reduce_class(
+                X_train['detection'][number_of_times],
+                self.detection_base_reducer,
+                self.detection_base_reducer_arguments)
         self.reducers['detection'][number_of_times] = detection_reducer
+
         # for efficiency, if not using different methods, could have
         # all 3 be the same
         # gram
@@ -327,9 +362,10 @@ class SeriesModel(object):
             X_gram = X_detection.copy()
             gram_reducer = detection_reducer
         else:
-            X_gram, gram_reducer = self._reduce_class(X_train,
-                                    self.gram_base_reducer,
-                                    self.gram_base_reducer_arguments)
+            X_gram_reduced, gram_reducer = self._reduce_class(
+                    X_train['gram'][number_of_times],
+                    self.gram_base_reducer,
+                    self.gram_base_reducer_arguments)
         self.reducers['gram'][number_of_times] = gram_reducer
 
         # classification
@@ -340,15 +376,15 @@ class SeriesModel(object):
             X_classification = X_gram.copy()
             classification_reducer = gram_reducer
         else:
-            X_classification, classification_reducer = self._reduce_class(X_train,
-                                    self.classification_base_reducer,
-                                    self.classification_base_reducer_arguments)
-
+            X_classification_reduced, classification_reducer = self._reduce_class(
+                    X_train['classification'][number_of_times],
+                    self.classification_base_reducer,
+                    self.classification_base_reducer_arguments)
         self.reducers['classification'][number_of_times] = classification_reducer
 
         end = time.time()
         if self.verbose:
-            ptf('... %d seconds' % (end-time))
+            ptf('... %d seconds' % (end-start))
 
         return X_detection, X_gram, X_classification
 
@@ -411,7 +447,7 @@ class SeriesModel(object):
         else:
             ptf('*** Unknown reducer_type %s.  No transformations done ***' % reducer_type, self.logfile)
 
-        X_features, scores = reducer.fit_transform(X_train)
+        X_features = reducer.fit_transform(X_train)
 
         return X_features, featurizer
 
@@ -419,6 +455,7 @@ class SeriesModel(object):
 
     ### SET-UP METHODS ###
 
+    # i. SETUP #
     def _build_results_dataframes(self, number_of_trials):
         # self.predictions = y.copy()
         # self.probabilities = y.copy()
@@ -467,15 +504,8 @@ class SeriesModel(object):
                 self.scores[label]['micro'] = pd.DataFrame(columns=df_columns)
                 self.scores[label]['macro'] = pd.DataFrame(columns=df_columns)
 
-    def _prepare_data(self, X):
-        Z = self.preprocess(X)
 
-        self._build_results_dataframes(len(Z))
-        self.trial_lengths = self.find_trial_lengths(Z)
-        self.inspect_trial_shapes(Z)
-
-        return Z
-
+    # i. SETUP #
     def _build_confusion_labels(self, y):
         # set confusion labels and their order
         confusion_labels = {}
@@ -491,6 +521,15 @@ class SeriesModel(object):
         confusion_labels['classification'] = np.array(b)
 
         return confusion_labels
+
+    def _build_crossvalidation_folds(self, y):
+        self.folds = defaultdict(dict)
+        sss = StratifiedShuffleSplit(y=y['classification'],
+                n_iter=self.nfolds,
+                test_size=self.fold_size,
+                random_state=1)
+        for train_index, test_index in sss:
+            self.folds[i] = {'train': train_index, 'test': test_index}
 
     ### UTILITY METHODS ###
 
@@ -561,17 +600,25 @@ class SeriesModel(object):
         return X
 
 
+    ### DEPRECATED METHODS ###
+    def _prepare_data(self, X):
+        Z = self.preprocess(X)
+
+        self._build_results_dataframes(len(Z))
+        self.trial_lengths = self.find_trial_lengths(Z)
+        self.inspect_trial_shapes(Z)
+
+        return Z
 
     ### NOT COMPLETED METHODS ###
+
     # def __repr__(self):
     #     print self
 
 
-
     def fit(self, X, y, verbose=False, debug=False):
         self.verbose = verbose
-        self.confusion_labels = self._build_confusion_labels(y)
-
+        self.debug = debug
         # start with the second time
         t = self.reference_time + self.min_time
         # don't use results for the first model made
@@ -581,9 +628,8 @@ class SeriesModel(object):
         else:
             self.times = np.arange(t, self.max_time, 1)
 
-        self._build_results_dataframes(len(X))
-        self.trial_lengths = self.find_trial_lengths(X)
-        self.inspect_trial_shapes(X)
+        # i) SETUP # GOOD
+        self.setup(X,y)
 
         # Check trial integrity
         if self.max_time > self.trial_lengths.min():
@@ -595,9 +641,12 @@ class SeriesModel(object):
         if self.featurizers_coldstart:
             X_preprocessed = self.preprocess(X)
             X_featurized = self.featurize(X_preprocessed, self.featurizer_pickle)
-            X_scaled = self.scale(X_featurized, self.scaler_pickle)
-            X_reduced = self.reduce(X_scaled, self.reducer_pickle)
-            self.pickle_features(X_reduced, self.features_pickle)
+
+            # do something about cross_validation
+            for fold in self.folds.keys():
+                X_scaled = self.scale(X_featurized, self.scaler_pickle, fold)
+                X_reduced = self.reduce(X_scaled, self.reducer_pickle, fold)
+                self.pickle_features(X_reduced, self.features_pickle, fold)
         else:
             X = self.load_features(self.features_pickle)
 
