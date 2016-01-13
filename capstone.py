@@ -33,15 +33,17 @@ from pympler import asizeof, tracker, classtracker
 START_DT = datetime.datetime.now()
 START_DT_STR = START_DT.strftime('%Y-%m-%d_%H-%M-%S')
 LOGFILE = open('log_%s.txt' % START_DT_STR, 'w')
+# LOGFILE = None
 PICKLE_NAMES = ['Xdf.pkl', 'ydf.pkl', 'used_column_headers.pkl']
 
 if __name__ == '__main__':
     # Capstone run conditions
     reload_data = False
-    reload_features = False
-    pickle_data = False # save loaded data to a pickle for greater loading efficiency
+    reload_features = True
+    reload_fold_features = True
+    pickle_data = True # save loaded data to a pickle for greater loading efficiency
     unittests = False
-    profile = False # do memory profiling
+    profile = True # do memory profiling
 
     # Model conditions
     verbose = True # how much output
@@ -120,25 +122,33 @@ if __name__ == '__main__':
 
 
     sm = SeriesModel(
+        features_pickle = 'features_%s.pkl' % START_DT_STR,
+        fold_features_pickle = 'fold_features_%s.pkl' % START_DT_STR,
+        fold_features_test_pickle = 'fold_features_test_%s.pkl' % START_DT_STR,
+        featurizer_pickle = 'featurizer_%s.pkl' % START_DT_STR,
+        reducer_pickle = 'reducer_%s.pkl' % START_DT_STR,
+        scaler_pickle = 'scaler_%s.pkl' % START_DT_STR,
         featurizer_coldstart = reload_features,
-        scaler_coldstart = reload_features,
-        reducer_coldstart = reload_features,
+        scaler_coldstart = reload_fold_features,
+        reducer_coldstart = reload_fold_features,
         logfile = LOGFILE,
         use_last_timestep_results = use_last_timestep_results,
         color_scale = 'RGB',
         color_vector_type = 'DI',
         reference_time = 9,
         min_time = 3,
-        detection_model = 'LR',
+        detection_model = 'LRCV',
         detection_model_arguments = {'n_jobs':n_jobs},
-        gram_model = 'LR',
+        gram_model = 'LRCV',
         gram_model_arguments = {'n_jobs':n_jobs, 'multi_class':'ovr'},
-        classification_model = 'LR',
+        classification_model = 'LRCV',
         classification_model_arguments = {'n_jobs':n_jobs, 'multi_class':'ovr'},
         detection_featurizer = 'poly',
-        detection_featurizer_arguments = {'n':4},
+        detection_featurizer_arguments = {'n':4, 'n_jobs': n_jobs, 'gridsearch': True},
         gram_featurizer = 'detection',
         classification_featurizer = 'detection',
+        detection_reducer = 'pca',
+        detection_reducer_arguments = {'n_components': 30}
         nfolds=nfolds,
         fold_size=fold_size
         )
@@ -246,6 +256,7 @@ if __name__ == '__main__':
     ptf('\n', LOGFILE)
     ptf('\treload_data: %s' % reload_data, LOGFILE)
     ptf('\treload_features: %s' % reload_features, LOGFILE)
+    ptf('\treload_fold_features: %s' % reload_fold_features, LOGFILE)
     ptf('\tn_jobs: %d\tn_cpus: %d' % (n_jobs, n_cpus), LOGFILE)
     ptf('\tdebug: %s' % debug, LOGFILE)
     ptf('\tprofile: %s' % profile, LOGFILE)
@@ -260,6 +271,9 @@ if __name__ == '__main__':
     ptf('\n>> Writing model results to %s' % model_file_name, LOGFILE)
     pickle.dump(sm, model_file, -1)
     model_file.close()
+
+    ptf('\n\n>> Other model details ', LOGFILE)
+    ptf(sm, LOGFILE)
 
     if False:
         start = time.time()

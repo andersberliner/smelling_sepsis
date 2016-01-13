@@ -2,6 +2,7 @@
 # Anders Berliner
 # 20160106
 from sklearn.linear_model import LinearRegression, Ridge, Lasso
+from sklearn.linear_model import LassoCV, RidgeCV
 from sklearn.grid_search import GridSearchCV
 from sklearn.preprocessing import PolynomialFeatures
 import numpy as np
@@ -13,12 +14,13 @@ from output_capstone import print_to_file_and_terminal as ptf
 class PolynomialFeaturizer(object):
     def __init__(self, n=4, reference_time=0,
             verbose=True, gridsearch=False, logfile=None,
-            regressor_type='OLS'):
+            regressor_type='OLS', n_jobs=1):
         self.n = n
         self.reference_time = reference_time
         self.verbose = verbose
         self.logfile = logfile
-        self.gridsearch  = gridsearch
+        self.gridsearch = gridsearch
+        self.n_jobs = n_jobs
 
     def fit(self, X):
         pass
@@ -43,8 +45,23 @@ class PolynomialFeaturizer(object):
         best_loss = None
         if self.gridsearch:
             # can use Ridge or Lasso here => gridsearch
-            pass
-        model = LinearRegression(fit_intercept=False, n_jobs=-1)
+            # random_forest_grid = {'max_depth': [3, None],
+            #           'max_features': ['sqrt', 'log2', None],
+            #           'min_samples_split': [1, 2, 4],
+            #           'min_samples_leaf': [1, 2, 4],
+            #           'bootstrap': [True, False],
+            #           'n_estimators': [10, 20, 40],
+            #           'random_state': [1]}
+            # rf_gridsearch = GridSearchCV(RandomForestRegressor(),
+            #                  random_forest_grid,
+            #                  n_jobs=-1,
+            #                  verbose=True,
+            #                  scoring='mean_squared_error')
+            # rf_gridsearch.fit(X_train, y_train)
+            model = LassoCV(fit_intercept=False, n_jobs=self.n_jobs)
+            self.regressor_type = 'LassoCV'
+        else:
+            model = LinearRegression(fit_intercept=False, n_jobs=self.n_jobs)
 
         coef_, scores_ = self._regress(X, model, poly)
         return coef_, scores_

@@ -3,7 +3,7 @@
 # 20160105
 import pandas as pd
 import numpy as np
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.cross_validation import StratifiedShuffleSplit
@@ -126,7 +126,18 @@ class SeriesModel(object):
         self.classification_base_featurizer_arguments = classification_featurizer_arguments
 
     ### MAIN METHODS ###
-
+    def __repr__(self):
+        for k, v in self.__dict__.iteritems():
+            try:
+                if type(v) in [str, int, float, bool]:
+                    try:
+                        print k, ':', v
+                    except:
+                        pass
+                else:
+                    print k, ':', type(v)
+            except:
+                pass
     # i) SETUP #
     def setup(self, X, y):
         start = time.time()
@@ -668,36 +679,40 @@ class SeriesModel(object):
         # [y_train_detection, y_train_gram, y_train_classification] = y
         # detection - calculate results
         ytp_pairs = ((y_train_true_timestep, y_train_predict_timestep),
-            (y_train_true_timestep, y_train_predict_timestep))
+            (y_test_true_timestep, y_test_predict_timestep))
         for (yt,yp), testtrain_type in izip(ytp_pairs, ['train', 'test']):
-            y_train_detection = yt['detection']
-            y_train_gram = yt['gram']
-            y_train_classification = yt['classification']
+            y_true_detection = yt['detection']
+            y_true_gram = yt['gram']
+            y_true_classification = yt['classification']
             y_predict_detection = yp['detection']
             y_predict_gram = yp['gram']
             y_predict_classification = yp['classification']
+
+            print testtrain_type
+            print len(y_true_detection), len(y_true_gram), len(y_true_classification)
+            print len(y_predict_detection), len(y_predict_gram), len(y_predict_classification)
 
             if self.verbose:
                 # print np.unique(y_predict_detection)
                 # print np.unique(y_train_detection)
                 # print self.confusion_labels['detection']
                 ptf( '%s Detection results' % testtrain_type, self.logfile)
-                ptf( mcm.classification_report_ovr(y_train_detection,
+                ptf( mcm.classification_report_ovr(y_true_detection,
                     y_predict_detection,
                     self.confusion_labels['detection']), self.logfile)
                 ptf( '%s Gram results' % testtrain_type, self.logfile)
-                ptf( mcm.classification_report_ovr(y_train_gram,
+                ptf( mcm.classification_report_ovr(y_true_gram,
                     y_predict_gram,
                     self.confusion_labels['gram']), self.logfile)
                 ptf( '%s Classification results' % testtrain_type, self.logfile)
-                ptf( mcm.classification_report_ovr(y_train_classification,
+                ptf( mcm.classification_report_ovr(y_true_classification,
                     y_predict_classification,
                     self.confusion_labels['classification'], s1=30), self.logfile)
 
-            scores = mcm.scores_binary(y_train_detection, y_predict_detection)
+            scores = mcm.scores_binary(y_true_detection, y_predict_detection)
             # print scores
             # builds confusion matrix of TP, FP, etc. for the detection case
-            cm = mcm.confusion_matrix_binary(y_train_detection, y_predict_detection)
+            cm = mcm.confusion_matrix_binary(y_true_detection, y_predict_detection)
             # print cm
             # detection - populate scores
             score_dict = self._populate_score_dict(cm, scores, number_of_times)
@@ -713,7 +728,7 @@ class SeriesModel(object):
             # gram, classification - calculate and populate results
             for result_type, predictions, truths in izip(['gram', 'classification'],
                     [y_predict_gram, y_predict_classification],
-                    [y_train_gram, y_train_classification]):
+                    [y_true_gram, y_true_classification]):
                 labels = list(self.confusion_labels[result_type])
                 cm = mcm.confusion_matrix_mc(truths, predictions, labels)
                 results = mcm.results_ovr(truths, predictions, labels)
@@ -816,6 +831,8 @@ class SeriesModel(object):
     def _fit_class(self, X_train, y_train, model_type, model_argmuents, step=None):
         if model_type == 'LR':
             model = LogisticRegression(**model_argmuents)
+        elif model_type == 'LRCV':
+            model = LogisticRegressionCV(**model_argmuents)
         elif model_type == 'RF':
             pass
         elif model_type == 'SVM':
@@ -1158,7 +1175,7 @@ class SeriesModel(object):
             ptf('\n>> 1A. Pickling features to %s ...' % self.features_pickle, self.logfile)
             self.pickle_features(X_featurized, self.features_pickle)
             end = time.time()
-            ptf('\n>> Pickling completed (%s seconds) <<' % (end-start), self.logfile)
+            ptf('\n>> Pickling completed (%d seconds) <<' % (end-start), self.logfile)
 
         else:
             start = time.time()
@@ -1167,7 +1184,7 @@ class SeriesModel(object):
             X_featurized = self.load_features(self.features_pickle)
             self.features = X_featurized
             end = time.time()
-            ptf('\n>> Loading completed (%s seconds) <<' % (end-start), self.logfile)
+            ptf('\n>> Loading completed (%d seconds) <<' % (end-start), self.logfile)
 
 
         if self.scaler_coldstart or self.reducer_coldstart:
@@ -1180,7 +1197,8 @@ class SeriesModel(object):
             ptf('\n>> 4A. Pickling final features to %s, %s' % (self.fold_features_pickle, self.fold_features_test_pickle), self.logfile)
             self.pickle_features(X_reduced, self.fold_features_pickle)
             self.pickle_features(self.fold_features_test, self.fold_features_test_pickle)
-            ptf('\n>> Pickling completed (%s seconds) <<' % (end-start), self.logfile)
+            end = time.time()
+            ptf('\n>> Pickling completed (%d seconds) <<' % (end-start), self.logfile)
 
         else:
             ptf('\n>> 1-4A. Loading fold_features from %s ...' % self.fold_features_pickle, self.logfile)
@@ -1231,6 +1249,9 @@ class SeriesModel(object):
 
                 # train on Xtrain fold features
                 # 5) TRAIN
+                # for lab, thing in izip(['Xn', 'Xt', 'yn', 'yt'], [X_train, X_test, y_train, y_test]):
+                #     for guy in thing:
+                #         print lab, guy.shape
                 models, train_predictions, train_probabilities = self.train(X_train, y_train, fold, t, use_last_timestep_results)
                 # 6) PREDICT
                 test_predictions, test_probabilities = self.predict(models, X_test, fold, t, use_last_timestep_results)
@@ -1256,6 +1277,7 @@ class SeriesModel(object):
                     t)
 
             # 8) SCORE
+            self.results_dicts = results_dicts
             self._score_one_timestep(results_dicts, t)
             use_last_timestep_results = self.use_last_timestep_results
 
