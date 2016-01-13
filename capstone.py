@@ -38,7 +38,7 @@ PICKLE_NAMES = ['Xdf.pkl', 'ydf.pkl', 'used_column_headers.pkl']
 
 if __name__ == '__main__':
     # Capstone run conditions
-    reload_data = False
+    reload_data = True
     reload_features = True
     reload_fold_features = True
     pickle_data = True # save loaded data to a pickle for greater loading efficiency
@@ -148,7 +148,7 @@ if __name__ == '__main__':
         gram_featurizer = 'detection',
         classification_featurizer = 'detection',
         detection_reducer = 'pca',
-        detection_reducer_arguments = {'n_components': 30}
+        detection_reducer_arguments = {'n_components': 30},
         nfolds=nfolds,
         fold_size=fold_size
         )
