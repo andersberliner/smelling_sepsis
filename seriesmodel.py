@@ -656,6 +656,8 @@ class SeriesModel(object):
         self.fold_features = defaultdict(dict)
         self.fold_features_test = defaultdict(dict)
         self.folds = defaultdict(dict)
+        self.fold_probabilities = defaultdict(dict)
+        self.fold_probabilities_test = defaultdict(dict)
         sss = StratifiedShuffleSplit(y=y['classification'],
                 n_iter=self.nfolds,
                 test_size=self.fold_size,
@@ -679,6 +681,13 @@ class SeriesModel(object):
                 'detection':defaultdict(dict),
                 'gram':defaultdict(dict),
                 'classification': defaultdict(dict)}
+
+            self.fold_probabilites[i] = {}
+            self.fold_probabilites_test[i] = {}
+            for k, v in self.confusion_labels.iteritems():
+                self.fold_probabilities[i][k] = np.zeros((len(train_index), len(v)))
+                self.fold_probabilities_test[i][k] = np.zeros((len(train_index), len(v)))
+
 
     ### UTILITY METHODS ###
 
@@ -858,6 +867,8 @@ class SeriesModel(object):
                 models, train_predictions = self.train(X, y, fold, t)
                 (model_detection, model_gram, model_classification) = models
                 (y_train_predictions_detection, y_train_predictions_gram, y_train_predictions_classification) = train_predictions
+
+
                 # accumulate y_pred_train, y_true_train
                 # y_train_pred_detection = model_detection.predict(self.fold_features_test[fold]['detection'][t])
                 # y_train_pred_gram = model_gram.predict(self.fold_features_test[fold]['gram'][t])
@@ -900,7 +911,55 @@ class SeriesModel(object):
 
 
 
-    def train(self):
+    def train(self, X, y, fold, t):
+        number_of_times = t
+        X = [X_train_detection, X_train_gram, X_train_classification]
+        y = [y_train_detection, y_train_gram, y_train_classification]
+        if use_last_timestep_results:
+            # append most recent probabilities of growth (col 1)
+            np_X_detection = np.hstack((X_train_detection,
+                self.fold_probabilities[fold]['detection'][:,1].reshape(-1,1)))
+
+        if self.verbose:
+            ptf( 'Training detection fold:%d, nt:%d ...' % (fold, number_of_times), self.logfile)
+
+        detection_model = self._fit_class(np_X_detection,
+            y_train_detection,
+            self.detection_base_model,
+            self.detection_base_model_arguments,
+            step=('detection t=%d_%d' % (fold,number_of_times)))
+
+        # store model, predict
+        self.models[fold]['detection'][number_of_times] = detection_model
+        y_predict_detection = detection_model.predict(np_X_detection)
+        y_probabilities_detection = detection_model.predict_proba(np_X_detection)
+
+        # fit gram
+        if self.verbose:
+            ptf( 'Training gram fold:%d, nt=%d ...' % (fold, number_of_times), self.logfile)
+
+        np_X_gram = np.hstack((X_gram_detection, y_probabilities_detection[:,1].reshape(-1,1)))
+        if use_last_timestep_results:
+            # append probas of n, p (not control)
+            np_X_gram = np.hstack((np_X_gram,
+                self.probabilities[fold]['gram'][:,:2]))
+
+        gram_model = self._fit_class(np_X_gram,
+            y_gram_detection,
+            self.gram_base_model,
+            self.gram_base_model_arguments,
+            step=('gram t=%d_%d' % (fold, number_of_times)))
+
+        # store model, predict
+        self.models[fold]['gram'][number_of_times] = gram_model
+        y_predict_gram = gram_model.predict(np_X_gram)
+        y_probabilities_gram = gram_model.predict_proba(np_X_gram)
+
+        # fit classification
+        if self.verbose:
+            ptf( 'Training classification fold:%d, nt=%d ...' % (fold, number_of_times), self.logfile)
+
+
         for t in self.times:
             y_train_true, y_train_pred = self._train_one_timestep(t)
 
