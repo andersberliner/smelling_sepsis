@@ -1127,7 +1127,7 @@ class SeriesModel(object):
 
 
     # i. SETUP #
-    d_confusion_labels(self, y):
+    def _build_confusion_labels(self, y):
         # set confusion labels and their order
         confusion_labels = {}
         for col in y.columns:
