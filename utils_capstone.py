@@ -13,7 +13,7 @@ from sklearn.cross_validation import train_test_split, StratifiedShuffleSplit
 from output_capstone import print_to_file_and_terminal as ptf
 import time
 
-from rpy2.robjects import r, pandas2ri, numpy2ri
+# from rpy2.robjects import r, pandas2ri, numpy2ri
 import pickle
 
 def my_to_r(x, xname):
