@@ -26,18 +26,43 @@ from capstone_r_tools import make_long_dataframe
 from sklearn.linear_model import LogisticRegression
 import pickle
 from itertools import izip
+import json
 
 # use pympler to do memory diagnosis
 from pympler import asizeof, tracker, classtracker
 
 START_DT = datetime.datetime.now()
 START_DT_STR = START_DT.strftime('%Y-%m-%d_%H-%M-%S')
-LOGFILE = open('log_%s.txt' % START_DT_STR, 'w')
-# LOGFILE = None
+RUNID = START_DT_STR
+RUNID = 'run001'
+LOGFILENAME = 'log_%s_%s.txt' % (RUNID, START_DT_STR)
+# LOGFILENAME = None
 PICKLE_NAMES = ['Xdf.pkl', 'ydf.pkl', 'used_column_headers.pkl']
 
+def ascii_encode_dict(data):
+    ascii_encode = lambda x: x.encode('ascii') if isinstance(x, unicode) else x
+    return dict(map(ascii_encode, pair) for pair in data.items())
+
 if __name__ == '__main__':
+    # creates a directory to store this runs work
+    if not os.path.exists('./' + RUNID):
+        os.makedirs('./' + RUNID)
+    if LOGFILENAME:
+        LOGFILE = open('./' + RUNID + '/' + LOGFILENAME, 'w')
+    else:
+        LOGFILE = NONE
+
+
+    with open((RUNID + '.json')) as f:
+        run_params = json.load(f, object_hook=ascii_encode_dict)
+
+    print run_params
+    # run_params = ascii_encode_dict(run_params)
+    # print run_params
     # Capstone run conditions
+    on_disk = True
+    load_state = None
+    load_time = 0
     reload_data = False
     pickle_preprocess_data = False
     reload_features = True
@@ -52,7 +77,7 @@ if __name__ == '__main__':
     n_cpus = multiprocessing.cpu_count()
     n_jobs = n_cpus # to see if more ram is used for more cpus
     use_last_timestep_results = False # feed forward probabilities
-    model = 'LR' # base model used for LR
+    model = 'LRCV' # base model used for LR
     featurizer = 'sigmoid' # base model used for featurization
     nfolds = 10 # number of cross_validation folds
     fold_size = 0.1 # size of cross_validation folds
@@ -123,12 +148,16 @@ if __name__ == '__main__':
 
 
     sm = SeriesModel(
-        features_pickle = 'features_%s.pkl' % START_DT_STR,
-        fold_features_pickle = 'fold_features_%s.pkl' % START_DT_STR,
-        fold_features_test_pickle = 'fold_features_test_%s.pkl' % START_DT_STR,
-        featurizer_pickle = 'featurizer_%s.pkl' % START_DT_STR,
-        reducer_pickle = 'reducer_%s.pkl' % START_DT_STR,
-        scaler_pickle = 'scaler_%s.pkl' % START_DT_STR,
+        # features_pickle = 'features_%s.pkl' % START_DT_STR,
+        # fold_features_pickle = 'fold_features_%s.pkl' % START_DT_STR,
+        # fold_features_test_pickle = 'fold_features_test_%s.pkl' % START_DT_STR,
+        # featurizer_pickle = 'featurizer_%s.pkl' % START_DT_STR,
+        # reducer_pickle = 'reducer_%s.pkl' % START_DT_STR,
+        # scaler_pickle = 'scaler_%s.pkl' % START_DT_STR,
+        on_disk = on_disk,
+        load_state = load_state,
+        load_time = load_time,
+        runid = RUNID,
         featurizer_coldstart = reload_features,
         scaler_coldstart = reload_fold_features,
         reducer_coldstart = reload_fold_features,
@@ -144,10 +173,11 @@ if __name__ == '__main__':
         gram_model_arguments = {'n_jobs':n_jobs, 'multi_class':'ovr'},
         classification_model = 'LRCV',
         classification_model_arguments = {'n_jobs':n_jobs, 'multi_class':'ovr'},
-        detection_featurizer = 'sigmoid',
-        detection_featurizer_arguments = {},
-        # detection_featurizer = 'poly',
-        # detection_featurizer_arguments = {'n':4, 'n_jobs': n_jobs, 'gridsearch': True},
+        # detection_featurizer = 'sigmoid',
+        # detection_featurizer_arguments = {},
+        detection_featurizer = 'poly',
+        detection_featurizer_arguments = {'n':4, 'n_jobs': n_jobs, 'gridsearch': False},
+        # detection_featurizer = None,
         gram_featurizer = 'detection',
         classification_featurizer = 'detection',
         detection_reducer = 'pca',
