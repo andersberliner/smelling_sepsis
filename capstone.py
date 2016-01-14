@@ -27,23 +27,46 @@ from sklearn.linear_model import LogisticRegression
 import pickle
 from itertools import izip
 import json
+import shutil
 
 # use pympler to do memory diagnosis
 from pympler import asizeof, tracker, classtracker
 
 START_DT = datetime.datetime.now()
 START_DT_STR = START_DT.strftime('%Y-%m-%d_%H-%M-%S')
-RUNID = START_DT_STR
+PICKLE_NAMES = ['Xdf.pkl', 'ydf.pkl', 'used_column_headers.pkl']
+
+### RUN CONDITIONS ###
 RUNID = 'run001'
 LOGFILENAME = 'log_%s_%s.txt' % (RUNID, START_DT_STR)
+MODELFILENAME = 'sm'
 # LOGFILENAME = None
-PICKLE_NAMES = ['Xdf.pkl', 'ydf.pkl', 'used_column_headers.pkl']
+pickle_data = True # save loaded data to a pickle for greater loading efficiency
+unittests = False
+profile = True # do memory profiling
+verbose = True # how much output
+debug = True # subset timeseries
+reload_data = False # use pickled data or load from folders
+n_cpus = multiprocessing.cpu_count()
 
 def ascii_encode_dict(data):
     ascii_encode = lambda x: x.encode('ascii') if isinstance(x, unicode) else x
     return dict(map(ascii_encode, pair) for pair in data.items())
 
 if __name__ == '__main__':
+    # do command-line processing for RUNID
+    from sys import argv
+    if len(argv) > 2:
+        print 'ERROR - to many command-line arguments'
+        print 'Usage capstone RUNID'
+        print 'Where RUNID is the folder and file name, minus extension of'
+        print 'the json containing the run conditions'
+    elif len(argv) == 2:
+        RUNID = argv[1]
+    else:
+        print 'NOTE: you can specify folder, json name on command line'
+        print 'Using default: %s' % RUNID
+
     # creates a directory to store this runs work
     if not os.path.exists('./' + RUNID):
         os.makedirs('./' + RUNID)
@@ -52,35 +75,18 @@ if __name__ == '__main__':
     else:
         LOGFILE = NONE
 
+    # copy run_params to that folder
+    shutil.copyfile((RUNID + '.json'), ('./' + RUNID + '/' + RUNID + '.json'))
 
+    # get the run conditions for the runid from the json
+    # NOTE excludes verbose and debug flags - those are fit parameters
+    # and exludes runid since that is set up above
     with open((RUNID + '.json')) as f:
         run_params = json.load(f, object_hook=ascii_encode_dict)
 
-    print run_params
-    # run_params = ascii_encode_dict(run_params)
     # print run_params
-    # Capstone run conditions
-    on_disk = True
-    load_state = None
-    load_time = 0
-    reload_data = False
-    pickle_preprocess_data = False
-    reload_features = True
-    reload_fold_features = True
-    pickle_data = True # save loaded data to a pickle for greater loading efficiency
-    unittests = False
-    profile = True # do memory profiling
 
-    # Model conditions
-    verbose = True # how much output
-    debug = True # subset timeseries
-    n_cpus = multiprocessing.cpu_count()
-    n_jobs = n_cpus # to see if more ram is used for more cpus
-    use_last_timestep_results = False # feed forward probabilities
-    model = 'LRCV' # base model used for LR
-    featurizer = 'sigmoid' # base model used for featurization
-    nfolds = 10 # number of cross_validation folds
-    fold_size = 0.1 # size of cross_validation folds
+    n_jobs = run_params['detection_model_arguments']['n_jobs'] # to see if more ram is used for more cpus
 
     bigstart = time.time()
     ptf('====> Starting job ID: %s <====' % START_DT_STR, LOGFILE)
@@ -88,11 +94,8 @@ if __name__ == '__main__':
     ptf('\tdebug: %s' % debug, LOGFILE)
     ptf('\tprofile: %s' % profile, LOGFILE)
     ptf('\tverbose: %s' % verbose, LOGFILE)
-    ptf('\tuse_last_timestep_results: %s' % use_last_timestep_results, LOGFILE)
-    ptf('\tmodel: %s' % model, LOGFILE)
-    ptf('\tfeaturizer: %s' % featurizer, LOGFILE)
-    ptf('\tnfolds: %s' % nfolds, LOGFILE)
-    ptf('\tfold_size: %s' % fold_size, LOGFILE)
+    for k, v in run_params.iteritems():
+        ptf('\t%s: %s' % (k,v), LOGFILE)
 
     if profile:
         # set-up some tracking statements from pympler
@@ -144,140 +147,10 @@ if __name__ == '__main__':
         end = time.time()
         ptf( 'Data unpickled in %d seconds (%d total trials)' % ((end-start), len(X)), LOGFILE)
 
+    run_params['logfile'] = LOGFILE
+    run_params['runid'] = RUNID
+    sm = SeriesModel(**run_params)
 
-
-
-    sm = SeriesModel(
-        # features_pickle = 'features_%s.pkl' % START_DT_STR,
-        # fold_features_pickle = 'fold_features_%s.pkl' % START_DT_STR,
-        # fold_features_test_pickle = 'fold_features_test_%s.pkl' % START_DT_STR,
-        # featurizer_pickle = 'featurizer_%s.pkl' % START_DT_STR,
-        # reducer_pickle = 'reducer_%s.pkl' % START_DT_STR,
-        # scaler_pickle = 'scaler_%s.pkl' % START_DT_STR,
-        on_disk = on_disk,
-        load_state = load_state,
-        load_time = load_time,
-        runid = RUNID,
-        featurizer_coldstart = reload_features,
-        scaler_coldstart = reload_fold_features,
-        reducer_coldstart = reload_fold_features,
-        logfile = LOGFILE,
-        use_last_timestep_results = use_last_timestep_results,
-        color_scale = 'RGB',
-        color_vector_type = 'DI',
-        reference_time = 9,
-        min_time = 3,
-        detection_model = 'LRCV',
-        detection_model_arguments = {'n_jobs':n_jobs},
-        gram_model = 'LRCV',
-        gram_model_arguments = {'n_jobs':n_jobs, 'multi_class':'ovr'},
-        classification_model = 'LRCV',
-        classification_model_arguments = {'n_jobs':n_jobs, 'multi_class':'ovr'},
-        # detection_featurizer = 'sigmoid',
-        # detection_featurizer_arguments = {},
-        detection_featurizer = 'poly',
-        detection_featurizer_arguments = {'n':4, 'n_jobs': n_jobs, 'gridsearch': False},
-        # detection_featurizer = None,
-        gram_featurizer = 'detection',
-        classification_featurizer = 'detection',
-        detection_reducer = 'pca',
-        detection_reducer_arguments = {'n_components': 30},
-        nfolds=nfolds,
-        fold_size=fold_size
-        )
-
-    if pickle_preprocess_data:
-        sm.setup(X,y)
-        Z = sm.preprocess(X)
-        Z = sm._subset_data(Z, 60)
-        myfile = open('DI.pkl', 'wb')
-        pickle.dump(Z, myfile, -1)
-        myfile.close()
-
-        print stuff
-
-    if False:
-
-        # i) SETUP
-        sm.setup(X,y)
-        if False:
-            print 'Confusion_labels'
-            print sm.confusion_labels
-            print 'Predictions'
-            print sm.fold_predictions
-            print 'Predcitions test'
-            print sm.fold_predictions_test
-            print 'Probas'
-            print sm.fold_probabilities
-            print 'Probas test'
-            print sm.fold_probabilities_test
-            print 'Results'
-            print sm.results
-            print 'Scores'
-            print sm.scores
-            print 'Scores test'
-            print sm.scores_test
-            print 'Models'
-            print sm.models
-            print 'Featurizers'
-            print sm.featurizers
-            print 'Reducers'
-            print sm.reducers
-            print 'Scalers'
-            print sm.scalers
-
-        # 0) PREPROCESS #
-        Z = sm.preprocess(X)
-        if debug:
-            print len(X), len(Z)
-            print X.iloc[0][8:12,0:4], Z.iloc[0][8:12, 0:4]
-
-        if False:
-            # make r-objects to figure out calls of lme4, glmer in rstudio
-            Xsub = sm._subset_data(Z, 50)
-
-            # print stuff
-            longdf = make_long_dataframe(Xsub, y, used_column_headers, Ntimes=50)
-
-            # export_to_r_and_pickle(Xsub, y, used_column_headers, 50)
-
-
-        sm.times = [15, 30, 50]
-        sm.verbose = True
-        sm.debug = True
-
-        # 1) FEATURIZE #
-        if reload_features:
-            Zf = sm.featurize(Z, sm.featurizer_pickle)
-            start = time.time()
-            myfile = open('features.pkl', 'wb')
-            pickle.dump(Zf, myfile)
-            myfile.close()
-            end = time.time()
-            ptf('Pickled in %d s' % (start-end), LOGFILE)
-        else:
-            start = time.time()
-            myfile = open('features.pkl', 'rb')
-            Zf = pickle.dump(myfile)
-            myfile.close()
-            sm.features = Zf
-            end = time.time()
-            ptf('Loaded features in %d s' % (start-end), LOGFILE)
-        if debug:
-            print 'Featurizers'
-            print sm.featurizers
-
-        # 2) SCALE #
-        Zs = sm.scale(Zf, sm.scaler_pickle)
-        if debug:
-            print 'Scalers'
-            print sm.scalers
-
-        # 3) REDUCE #
-        Zr = sm.reduce(Zs, sm.reducer_pickle)
-        if debug:
-            print 'Reducers'
-            print sm.reducers
 
     # Altogether now
     print ('** DOING THE FIT **')
@@ -287,31 +160,22 @@ if __name__ == '__main__':
 
     ptf('====> Completed job ID: %s <====' % START_DT_STR, LOGFILE)
     ptf('====> %d seconds (%0.1f mins)' % ((bigend-bigstart), (bigend-bigstart)/60.0), LOGFILE)
+
+    model_file = open('./' + RUNID + '/' + MODELFILENAME, 'wb')
+    ptf('\n>> Writing model results to %s' % MODELFILENAME, LOGFILE)
+    pickle.dump(sm, model_file, -1)
+    model_file.close()
+
+    ptf('\n\n>> Run details <<')
     ptf('\tntrials: %d' % len(X), LOGFILE)
     ptf('\tntimes: %d' % len(sm.times), LOGFILE)
-    ptf('\tnfolds: %s' % nfolds, LOGFILE)
-    ptf('\tfold_size: %s' % fold_size, LOGFILE)
-    ptf('\tuse_last_timestep_results: %s' % use_last_timestep_results, LOGFILE)
-    ptf('\tmodel: %s' % model, LOGFILE)
-    ptf('\tfeaturizer: %s' % featurizer, LOGFILE)
-    ptf('\n', LOGFILE)
-    ptf('\treload_data: %s' % reload_data, LOGFILE)
-    ptf('\treload_features: %s' % reload_features, LOGFILE)
-    ptf('\treload_fold_features: %s' % reload_fold_features, LOGFILE)
     ptf('\tn_jobs: %d\tn_cpus: %d' % (n_jobs, n_cpus), LOGFILE)
     ptf('\tdebug: %s' % debug, LOGFILE)
     ptf('\tprofile: %s' % profile, LOGFILE)
     ptf('\tverbose: %s' % verbose, LOGFILE)
-    ptf('\n', LOGFILE)
-    ptf('\tfeatures_pickle' % sm.features_pickle, LOGFILE)
-    ptf('\tfold_features_pickle' % sm.fold_features_pickle, LOGFILE)
+    for k, v in run_params.iteritems():
+        ptf('\t%s: %s' % (k,v), LOGFILE)
 
-    model_file_name = 'sm_model_%s.pkl' % START_DT_STR
-
-    model_file = open(model_file_name, 'wb')
-    ptf('\n>> Writing model results to %s' % model_file_name, LOGFILE)
-    pickle.dump(sm, model_file, -1)
-    model_file.close()
 
     ptf('\n\n>> Other model details ', LOGFILE)
     ptf(sm, LOGFILE)
@@ -403,6 +267,101 @@ if __name__ == '__main__':
     ### Unittests ###
     if False:
         sm_unit = run_unittests(X_test, y_test, verbose=False)
+
+
+
+    if False:
+        sm.setup(X,y)
+        Z = sm.preprocess(X)
+        Z = sm._subset_data(Z, 60)
+        myfile = open('DI.pkl', 'wb')
+        pickle.dump(Z, myfile, -1)
+        myfile.close()
+
+        print stuff
+
+    if False:
+
+        # i) SETUP
+        sm.setup(X,y)
+        if False:
+            print 'Confusion_labels'
+            print sm.confusion_labels
+            print 'Predictions'
+            print sm.fold_predictions
+            print 'Predcitions test'
+            print sm.fold_predictions_test
+            print 'Probas'
+            print sm.fold_probabilities
+            print 'Probas test'
+            print sm.fold_probabilities_test
+            print 'Results'
+            print sm.results
+            print 'Scores'
+            print sm.scores
+            print 'Scores test'
+            print sm.scores_test
+            print 'Models'
+            print sm.models
+            print 'Featurizers'
+            print sm.featurizers
+            print 'Reducers'
+            print sm.reducers
+            print 'Scalers'
+            print sm.scalers
+
+        # 0) PREPROCESS #
+        Z = sm.preprocess(X)
+        if debug:
+            print len(X), len(Z)
+            print X.iloc[0][8:12,0:4], Z.iloc[0][8:12, 0:4]
+
+        if False:
+            # make r-objects to figure out calls of lme4, glmer in rstudio
+            Xsub = sm._subset_data(Z, 50)
+
+            # print stuff
+            longdf = make_long_dataframe(Xsub, y, used_column_headers, Ntimes=50)
+
+            # export_to_r_and_pickle(Xsub, y, used_column_headers, 50)
+
+
+        sm.times = [15, 30, 50]
+        sm.verbose = True
+        sm.debug = True
+
+        # 1) FEATURIZE #
+        if reload_features:
+            Zf = sm.featurize(Z, sm.featurizer_pickle)
+            start = time.time()
+            myfile = open('features.pkl', 'wb')
+            pickle.dump(Zf, myfile)
+            myfile.close()
+            end = time.time()
+            ptf('Pickled in %d s' % (start-end), LOGFILE)
+        else:
+            start = time.time()
+            myfile = open('features.pkl', 'rb')
+            Zf = pickle.dump(myfile)
+            myfile.close()
+            sm.features = Zf
+            end = time.time()
+            ptf('Loaded features in %d s' % (start-end), LOGFILE)
+        if debug:
+            print 'Featurizers'
+            print sm.featurizers
+
+        # 2) SCALE #
+        Zs = sm.scale(Zf, sm.scaler_pickle)
+        if debug:
+            print 'Scalers'
+            print sm.scalers
+
+        # 3) REDUCE #
+        Zr = sm.reduce(Zs, sm.reducer_pickle)
+        if debug:
+            print 'Reducers'
+            print sm.reducers
 
 
     LOGFILE.close()

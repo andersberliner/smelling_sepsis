@@ -1,3 +1,44 @@
+    sm = SeriesModel(
+        # features_pickle = 'features_%s.pkl' % START_DT_STR,
+        # fold_features_pickle = 'fold_features_%s.pkl' % START_DT_STR,
+        # fold_features_test_pickle = 'fold_features_test_%s.pkl' % START_DT_STR,
+        # featurizer_pickle = 'featurizer_%s.pkl' % START_DT_STR,
+        # reducer_pickle = 'reducer_%s.pkl' % START_DT_STR,
+        # scaler_pickle = 'scaler_%s.pkl' % START_DT_STR,
+        on_disk = on_disk,
+        load_state = load_state,
+        load_time = load_time,
+        runid = RUNID,
+        featurizer_coldstart = reload_features,
+        scaler_coldstart = reload_fold_features,
+        reducer_coldstart = reload_fold_features,
+        logfile = LOGFILE,
+        use_last_timestep_results = use_last_timestep_results,
+        color_scale = 'RGB',
+        color_vector_type = 'DI',
+        reference_time = 9,
+        min_time = 3,
+        detection_model = 'LRCV',
+        detection_model_arguments = {'n_jobs':n_jobs},
+        gram_model = 'LRCV',
+        gram_model_arguments = {'n_jobs':n_jobs, 'multi_class':'ovr'},
+        classification_model = 'LRCV',
+        classification_model_arguments = {'n_jobs':n_jobs, 'multi_class':'ovr'},
+        # detection_featurizer = 'sigmoid',
+        # detection_featurizer_arguments = {},
+        detection_featurizer = 'poly',
+        detection_featurizer_arguments = {'n':4, 'n_jobs': n_jobs, 'gridsearch': False},
+        # detection_featurizer = None,
+        gram_featurizer = 'detection',
+        classification_featurizer = 'detection',
+        detection_reducer = 'pca',
+        detection_reducer_arguments = {'n_components': 30},
+        nfolds=nfolds,
+        fold_size=fold_size
+        )
+
+
+
 # score and write to scores
 self._score_one_timestep(y, y_predict_detection,
                          y_predict_gram, y_predict_classification,
@@ -328,3 +369,25 @@ def _predict_featurize_class(self, X, featurizer):
                                      (y_predict_classification, y_probabilities_classification),
                                      t)
         return self.results
+
+
+
+
+            ptf('\tnfolds: %s' % nfolds, LOGFILE)
+            ptf('\tfold_size: %s' % fold_size, LOGFILE)
+            ptf('\tuse_last_timestep_results: %s' % use_last_timestep_results, LOGFILE)
+            ptf('\tmodel: %s' % model, LOGFILE)
+            ptf('\tfeaturizer: %s' % featurizer, LOGFILE)
+            ptf('\n', LOGFILE)
+            ptf('\treload_data: %s' % reload_data, LOGFILE)
+            ptf('\treload_features: %s' % reload_features, LOGFILE)
+            ptf('\treload_fold_features: %s' % reload_fold_features, LOGFILE)
+            ptf('\tn_jobs: %d\tn_cpus: %d' % (n_jobs, n_cpus), LOGFILE)
+            ptf('\tdebug: %s' % debug, LOGFILE)
+            ptf('\tprofile: %s' % profile, LOGFILE)
+            ptf('\tverbose: %s' % verbose, LOGFILE)
+            ptf('\n', LOGFILE)
+            ptf('\tfeatures_pickle' % sm.features_pickle, LOGFILE)
+            ptf('\tfold_features_pickle' % sm.fold_features_pickle, LOGFILE)
+
+            model_file_name = 'sm_model_%s.pkl' % START_DT_STR
