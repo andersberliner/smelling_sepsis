@@ -5,6 +5,8 @@ from sklearn.linear_model import LinearRegression, Ridge, Lasso
 from sklearn.linear_model import LassoCV, RidgeCV
 from sklearn.grid_search import GridSearchCV
 from sklearn.preprocessing import PolynomialFeatures
+from sklearn.metrics import r2_score
+from scipy.optimize import curve_fit
 import numpy as np
 import pandas as pd
 from itertools import izip
@@ -108,7 +110,7 @@ class PolynomialFeaturizer(object):
         coef_ = X.copy()
         scores_ = X.apply(lambda x: np.zeros(number_of_spots))
         for trial_index, x in enumerate(X):
-            if trial_index % 100 == 0:
+            if trial_index % 10 == 0:
                 if self.verbose:
                     ptf( 'Featurizing trial %d'%  trial_index, self.logfile)
             # regress coefficients are (poly order +1 )x(n_spots)
@@ -142,8 +144,20 @@ class PolynomialFeaturizer(object):
 
 
 class KineticsFeaturizer(object):
-    def __init__(self):
-        pass
+    def __init__(self, p_init = [1,1,-100], verbose=False, reference_time=0,
+            logfile=None, ftol=0.00001, xtol=0.00001, gtol=0.00001, maxfev=10000):
+        self.p_init = p_init
+        self.reference_time = reference_time
+        self.verbose = verbose
+        self.logfile = logfile
+        self.ftol = ftol
+        self.xtol = xtol
+        self.gtol = gtol
+        self.maxfev = maxfev
+
+    def sigmoid(self, t,A,k,C):
+        y = 1./(A + np.exp(-(k*t + C)))
+        return y
 
     def fit(self, X):
         pass
@@ -152,7 +166,81 @@ class KineticsFeaturizer(object):
         pass
 
     def fit_transform(self, X):
-        pass
+        coef_, scores_ = self._regress(X)
+        return coef_, scores_
+
+    def predict(self, Z, coefs):
+        # first column of Z is time
+        # we will replace the other columns with regressed data
+
+        for trial_index, (coefficients, x) in enumerate(izip(coefs, Z)):
+            # only regress on data past reference time
+            t = t[self.reference_time:]
+
+            z = np.zeros(x.shape)
+            # first column is time
+            z[:,0] = x[:,0]
+            # columns up to reference time are just 0 and were not regressed
+            z[:self.reference_time, 1:] = 0
+            # columns after reference_time were regressed with coefficients
+            z[self.reference_time:, 1:] = self.sigmoid(t, *coefficients)
+            Z.iloc[trial_index] = z
+        return Z
+
+    def sigmoid(self, t,A,k,C):
+        y = 1./(A + np.exp(-(k*t + C)))
+        return y
+
+    def _regress(self, X):
+        start = time.time()
+
+        number_of_spots = X.iloc[0].shape[1]-1
+        self.number_of_spots = number_of_spots
+        coef_ = X.copy()
+        scores_ = X.apply(lambda x: np.zeros(number_of_spots))
+        for trial_index, x in enumerate(X):
+            if trial_index % 100 == 0:
+                if self.verbose:
+                    ptf( 'Featurizing trial %d'%  trial_index, self.logfile)
+            # regress coefficients are (poly order +1 )x(n_spots)
+            coefficients = np.zeros((3, number_of_spots))
+            scores = np.zeros(number_of_spots)
+
+            t = x[:,0]
+            t = t[self.reference_time:]
+            for column_index in np.arange(x.shape[1]):
+                # if column_index % 10 == 0:
+                #     if self.verbose:
+                #         ptf( 'ci:%d'%  column_index, self.logfile)
+                # print column_index
+                spot_index = column_index - 1
+                if column_index == 0:
+                    pass
+                else:
+                    # only fit data past the reference_time
+                    # other data is 0 from preprocessing
+                    # print t.shape, x[self.reference_time:, column_index].shape
+                    # print t
+                    # print x[self.reference_time:, column_index]
+                    # print self.p_init
+                    popt, pcov = curve_fit(self.sigmoid,
+                        t,
+                        x[self.reference_time:,column_index],
+                        p0=self.p_init,
+                        ftol=self.ftol,
+                        xtol=self.xtol,
+                        gtol=self.gtol,
+                        maxfev=self.maxfev)
+                    coefficients[:, spot_index] = popt
+                    xpred = self.sigmoid(t, *popt)
+                    scores[spot_index] = r2_score(x[self.reference_time:, column_index], xpred)
+            coef_.iloc[trial_index] = coefficients
+            scores_.iloc[trial_index] = scores
+
+        end = time.time()
+        ptf( 'Regressed %d trials in %d seconds' % (len(X), (end-start)), self.logfile)
+        return coef_, scores_
+
 
 class LongitudinalFeaturizer(object):
     def __init__(self):

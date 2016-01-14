@@ -9,7 +9,7 @@ from sklearn.decomposition import PCA
 from sklearn.cross_validation import StratifiedShuffleSplit
 from itertools import izip
 from collections import defaultdict
-from featurizer import PolynomialFeaturizer
+from featurizer import PolynomialFeaturizer, KineticsFeaturizer
 import multiclassmetrics as mcm
 import time
 from functools import partial
@@ -37,6 +37,8 @@ class SeriesModel(object):
                     scaler_coldstart = True,
                     detection_model='LR',
                     detection_model_arguments={},
+                    detection_scaler='SS',
+                    detection_scaler_arguments={},
                     detection_reducer='pca',
                     detection_reducer_arguments={},
                     detection_featurizer='poly',
@@ -47,12 +49,16 @@ class SeriesModel(object):
                     gram_reducer_arguments={},
                     gram_featurizer='detection',
                     gram_featurizer_arguments={},
+                    gram_scaler='detection',
+                    gram_scaler_arguments={},
                     classification_model='LR',
                     classification_model_arguments={},
                     classification_reducer='pca',
                     classification_reducer_arguments={},
                     classification_featurizer='gram',
                     classification_featurizer_arguments={},
+                    classification_scaler='gram',
+                    classification_scaler_arguments={},
                     nfolds=1,
                     fold_size=0.1):
         self.X = X
@@ -104,26 +110,32 @@ class SeriesModel(object):
         self.detection_base_model = detection_model
         self.detection_base_reducer = detection_reducer
         self.detection_base_featurizer = detection_featurizer
+        self.detection_base_scaler = detection_scaler
 
         self.gram_base_model = gram_model
         self.gram_base_reducer = gram_reducer
         self.gram_base_featurizer = gram_featurizer
+        self.gram_base_scaler = gram_scaler
 
         self.classification_base_model = classification_model
         self.classification_base_reducer = classification_reducer
         self.classification_base_featurizer = classification_featurizer
+        self.classification_base_scaler = classification_scaler
 
         self.detection_base_model_arguments = detection_model_arguments
         self.detection_base_reducer_arguments = detection_reducer_arguments
         self.detection_base_featurizer_arguments = detection_featurizer_arguments
+        self.detection_base_scaler_arguments = detection_scaler_arguments
 
         self.gram_base_model_arguments = gram_model_arguments
         self.gram_base_reducer_arguments = gram_reducer_arguments
         self.gram_base_featurizer_arguments = gram_featurizer_arguments
+        self.gram_base_scaler_arguments = gram_scaler_arguments
 
         self.classification_base_model_arguments = classification_model_arguments
         self.classification_base_reducer_arguments = classification_reducer_arguments
         self.classification_base_featurizer_arguments = classification_featurizer_arguments
+        self.classification_base_scaler_arguments = classification_scaler_arguments
 
     ### MAIN METHODS ###
     def __repr__(self):
@@ -546,23 +558,40 @@ class SeriesModel(object):
 
         # detection
         X_train_detection = self._subset_fold(X, fold, 'detection', number_of_times, 'train')
-        X_detection_scaled, detection_scaler = self._scale_class(X_train_detection)
+        X_detection_scaled, detection_scaler = self._scale_class(
+            X_train_detection,
+            self.detection_base_scaler,
+            self.detection_base_scaler_arguments)
         self.scalers[fold]['detection'][number_of_times] = detection_scaler
 
         X_test_detection = self._subset_fold(X, fold, 'detection', number_of_times, 'test')
         X_test_detection_scaled = detection_scaler.transform(X_test_detection)
 
         # gram
-        X_train_gram = self._subset_fold(X, fold, 'gram', number_of_times, 'train')
-        X_gram_scaled, gram_scaler = self._scale_class(X_train_gram)
+        if self.gram_base_scaler == 'detection':
+            X_gram_scaled = X_detection_scaled.copy()
+            gram_scaler = detection_scaler
+        else:
+            X_train_gram = self._subset_fold(X, fold, 'gram', number_of_times, 'train')
+            X_gram_scaled, gram_scaler = self._scale_class(
+                X_train_gram,
+                self.gram_base_scaler,
+                self.gram_base_scaler_arguments)
         self.scalers[fold]['gram'][number_of_times] = gram_scaler
 
         X_test_gram = self._subset_fold(X, fold, 'gram', number_of_times, 'test')
         X_test_gram_scaled = gram_scaler.transform(X_test_gram)
 
         # classification
-        X_train_classification = self._subset_fold(X, fold, 'classification', number_of_times, 'train')
-        X_classification_scaled, classification_scaler = self._scale_class(X_train_classification)
+        if self.classification_base_scaler == 'detection':
+            X_classification_scaled =  X_detection_scaled.copy()
+            classification_scaler = detection_scaler
+        elif self.classification_base_scaler == 'gram':
+            X_classification_scaled =  X_gram_scaled.copy()
+            classification_scaler = gram_scaler
+        else:
+            X_train_classification = self._subset_fold(X, fold, 'classification', number_of_times, 'train')
+            X_classification_scaled, classification_scaler = self._scale_class(X_train_classification)
         self.scalers[fold]['classification'][number_of_times] = classification_scaler
 
         X_test_classification = self._subset_fold(X, fold, 'classification', number_of_times, 'test')
@@ -765,7 +794,7 @@ class SeriesModel(object):
     def _featurize_class(self, X_train, featurizer_type, featurizer_arguments):
         X_features = X_train.copy()
         if not featurizer_type:
-            return X_features
+            return X_features, None
 
         if featurizer_type == 'poly':
             featurizer_arguments['reference_time'] = self.reference_time
@@ -781,7 +810,7 @@ class SeriesModel(object):
             featurizer_arguments['reference_time'] = self.reference_time
             featurizer_arguments['logfile'] = self.logfile
             featurizer_arguments['verbose'] = self.verbose
-            pass
+            featurizer = KineticsFeaturizer(**featurizer_arguments)
         elif featurizer_type == 'forecast':
             featurizer_arguments['reference_time'] = self.reference_time
             featurizer_arguments['logfile'] = self.logfile
@@ -801,11 +830,17 @@ class SeriesModel(object):
         return X_features, featurizer
 
     # 2) SCALE #
-    def _scale_class(self, X):
-        ss = StandardScaler()
+    def _scale_class(self, X, scaler_type, scaler_arguments):
         X = X.copy()
-        X_scaled = ss.fit_transform(X)
 
+        if not scaler_type:
+            return X, None
+
+        if scaler_type == 'SS':
+            ss = StandardScaler(**scaler_arguments)
+            # featurizer = PolynomialFeaturizer(**featurizer_arguments)
+
+        X_scaled = ss.fit_transform(X)
         return X_scaled, ss
 
     # 3) REDUCE #

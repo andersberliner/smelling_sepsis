@@ -38,7 +38,8 @@ PICKLE_NAMES = ['Xdf.pkl', 'ydf.pkl', 'used_column_headers.pkl']
 
 if __name__ == '__main__':
     # Capstone run conditions
-    reload_data = True
+    reload_data = False
+    pickle_preprocess_data = False
     reload_features = True
     reload_fold_features = True
     pickle_data = True # save loaded data to a pickle for greater loading efficiency
@@ -52,7 +53,7 @@ if __name__ == '__main__':
     n_jobs = n_cpus # to see if more ram is used for more cpus
     use_last_timestep_results = False # feed forward probabilities
     model = 'LR' # base model used for LR
-    featurizer = 'poly' # base model used for featurization
+    featurizer = 'sigmoid' # base model used for featurization
     nfolds = 10 # number of cross_validation folds
     fold_size = 0.1 # size of cross_validation folds
 
@@ -143,8 +144,10 @@ if __name__ == '__main__':
         gram_model_arguments = {'n_jobs':n_jobs, 'multi_class':'ovr'},
         classification_model = 'LRCV',
         classification_model_arguments = {'n_jobs':n_jobs, 'multi_class':'ovr'},
-        detection_featurizer = 'poly',
-        detection_featurizer_arguments = {'n':4, 'n_jobs': n_jobs, 'gridsearch': True},
+        detection_featurizer = 'sigmoid',
+        detection_featurizer_arguments = {},
+        # detection_featurizer = 'poly',
+        # detection_featurizer_arguments = {'n':4, 'n_jobs': n_jobs, 'gridsearch': True},
         gram_featurizer = 'detection',
         classification_featurizer = 'detection',
         detection_reducer = 'pca',
@@ -153,7 +156,15 @@ if __name__ == '__main__':
         fold_size=fold_size
         )
 
+    if pickle_preprocess_data:
+        sm.setup(X,y)
+        Z = sm.preprocess(X)
+        Z = sm._subset_data(Z, 60)
+        myfile = open('DI.pkl', 'wb')
+        pickle.dump(Z, myfile, -1)
+        myfile.close()
 
+        print stuff
 
     if False:
 
