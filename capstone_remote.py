@@ -177,8 +177,8 @@ if __name__ == '__main__':
         ptf('\t%s: %s' % (k,v), LOGFILE)
 
 
-    ptf('\n\n>> Other model details ', LOGFILE)
-    ptf(sm, LOGFILE)
+    # ptf('\n\n>> Other model details ', LOGFILE)
+    # ptf(sm, LOGFILE)
 
     if False:
         start = time.time()
