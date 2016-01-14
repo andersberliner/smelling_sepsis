@@ -1,7 +1,7 @@
 # capstone_r_tools.py
 # Anders Berliner
 # 20160112
-from rpy2.robjects import pandas2ri, r
+#from rpy2.robjects import pandas2ri, r
 import pandas as pd
 import numpy as np
 import time
