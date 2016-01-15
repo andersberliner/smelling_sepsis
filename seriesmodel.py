@@ -229,17 +229,14 @@ class SeriesModel(object):
     def __repr__(self):
         # NOTE: needs debugging as some classes still cause error when trying to
         # print
-        for k, v in self.__dict__.iteritems():
-            try:
-                if type(v) in [str, int, float, bool]:
-                    try:
-                        print k, ':', v
-                    except:
-                        pass
-                else:
-                    print k, ':', type(v)
-            except:
-                pass
+        keys = self.__dict__.keys()
+        keys.sort()
+        for k in keys:
+            v = self.__dict__[k]
+            if type(v) in [str, int, float, bool]:
+                print k, ':', v
+            else:
+                print k, ':', str(type(v))
 
     # i) SETUP #
     def setup(self, X, y):
@@ -526,8 +523,8 @@ class SeriesModel(object):
 
         if use_last_timestep_results:
             # append most recent probabilities of growth (col 1)
-            print X_train_detection.shape, self.fold_probabilities[fold]['detection'].shape
-            print self.fold_probabilities[fold]['detection'][:,1].reshape(-1,1)
+            if self.debug:
+                print X_train_detection.shape, self.fold_probabilities[fold]['detection'].shape
             np_X_detection = np.hstack((X_train_detection,
                 self.fold_probabilities[fold]['detection'][:,1].reshape(-1,1)))
         else:
@@ -664,7 +661,7 @@ class SeriesModel(object):
         if use_last_timestep_results:
             # append probas of all non-control classes
             np_X_classification = np.hstack((np_X_classification,
-                self.probabilities[fold]['classification'][:,1:]))
+                self.fold_probabilities[fold]['classification'][:,1:]))
 
         y_predict_classification = model_classification.predict(np_X_classification)
         y_probabilities_classification = model_classification.predict_proba(np_X_classification)
@@ -1569,10 +1566,6 @@ class SeriesModel(object):
         return Z
 
     ### NOT COMPLETED METHODS ###
-
-    # def __repr__(self):
-    #     print self
-
     def bayes_update(self,t):
         # use Bayesian prior/posterior ideas to update predictions, probabilities
         # based on most recent timestep
