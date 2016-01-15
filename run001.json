@@ -7,7 +7,7 @@
   "reference_time" :  9,
   "max_time" :  60,
   "min_time" :  3,
-  "use_last_timestep_results" :  false,
+  "use_last_timestep_results" :  true,
   "features_pickle" :  "features.pkl",
   "fold_features_pickle" :  "fold_features.pkl",
   "fold_features_test_pickle" :  "fold_features_test.pkl",

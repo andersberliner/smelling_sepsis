@@ -470,7 +470,6 @@ class SeriesModel(object):
         # pickle features
         if self.on_disk:
             ptf(' > pickled at each timestep & fold <')
-            return
         else:
             self.pickle_time_step(data, ftype, file_name = features_pickle)
 
@@ -527,6 +526,8 @@ class SeriesModel(object):
 
         if use_last_timestep_results:
             # append most recent probabilities of growth (col 1)
+            print X_train_detection.shape, self.fold_probabilities[fold]['detection'].shape
+            print self.fold_probabilities[fold]['detection'][:,1].reshape(-1,1)
             np_X_detection = np.hstack((X_train_detection,
                 self.fold_probabilities[fold]['detection'][:,1].reshape(-1,1)))
         else:
@@ -1032,16 +1033,12 @@ class SeriesModel(object):
             for class_predictions, class_probabilities, label_type in izip(predictions, probabilities, labels_types):
                 if testtrain_type == 'train':
                     self.fold_predictions[fold][label_type] = class_predictions
-                    self.fold_probabilities[fold][label_type] = class_predictions
+                    self.fold_probabilities[fold][label_type] = class_probabilities
                 else:
                     self.fold_predictions_test[fold][label_type] = class_predictions
-                    self.fold_probabilities_test[fold][label_type] = class_predictions
+                    self.fold_probabilities_test[fold][label_type] = class_probabilities
 
     # 8) SCORE #
-    #
-    # def _score_one_timestep(self, y, y_predict_detection,
-    #                          y_predict_gram, y_predict_classification,
-    #                          number_of_times, fold):
     def _score_one_timestep(self, results_dicts, number_of_times):
         (y_train_true_timestep,
             y_train_predict_timestep,
@@ -1395,17 +1392,18 @@ class SeriesModel(object):
         return [t for t in times if t >= tstart]
 
     def make_fname(self, piece, t=-1, fold=-1):
-        if not os.path.exists('./' + self.runid):
-            os.makedirs('./' + self.runid)
-        fname = './' + self.runid + '/' + piece
+        if not os.path.exists(self.runid):
+            os.makedirs(self.runid)
+        fname = self.runid + '/' + piece
         if t>-1:
-            fname = './' + self.runid + '/' + piece + '_t_' + str(t)
+            fname = self.runid + '/' + piece + '_t_' + str(t)
             if fold:
-                fname = './' + self.runid + '/' + piece + '_f_' + str(fold) + '_t_' + str(t)
+                fname = self.runid + '/' + piece + '_f_' + str(fold) + '_t_' + str(t)
         elif fold>-1:
-            fname = './' + self.runid + '/' + piece + '_f_' + str(fold)
+            fname = self.runid + '/' + piece + '_f_' + str(fold)
         fname = fname + '.pkl'
         return fname
+
 
 
 
@@ -1656,7 +1654,7 @@ class SeriesModel(object):
         ptf('\n\n>> 5. Training, 6. Predicting, 7. Scoring and 8. Storing ... \n\n', self.logfile)
         fitstart = time.time()
 
-        use_last_timestep_results = False # don't use for first timestep
+        # use_last_timestep_results = False # don't use for first timestep
         for t in self.times:
             start = time.time()
 
