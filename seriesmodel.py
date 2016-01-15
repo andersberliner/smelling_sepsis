@@ -1,6 +1,11 @@
-# seriesmodel.py
-# Anders Berliner
-# 20160105
+'''
+seriesmodel.py
+Anders Berliner
+20160105
+
+Contains the series model class.
+
+'''
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
@@ -66,6 +71,79 @@ class SeriesModel(object):
                     classification_scaler_arguments={},
                     nfolds=1,
                     fold_size=0.1):
+        '''
+        Initializes the SeriesModel class.
+
+        Run paramters are usually passed in from capstone via a run json.  see
+        an example json at run001.json.
+
+        NOTE: For more information on expected data structures, see the
+        data structures page linked from the read (not done)
+
+        IN:
+            SeriesModel
+            logfile - fileobj - an open text file where logs are written
+            X - pd dataframe - trial data.  see data structures.  Usually passed in to fit
+            y - pd dataframe - trial labels.  see data structures.  Usually passed in to fit
+            on_disk - bool - stores steps on HD (T), or keep everything in memory (F)
+            load_state - str - stage to start job at.  Accepted values:
+                ['setup', 'preprocess', 'featurize', 'pickle','scale', 'reduce', 'train']
+            load_time - int - timestep to start job at (for featurize only)
+            color_scale - str - color scale to use when preprocessing raw data.
+                'RBG', 'CSV' (not implemented)
+            color_vector_type - str - preprocess data as raw 'I', differences 'DI',
+                or percent differences 'DII'
+            reference_time - int - "burn-in" period (as an index) for the data.  Used to define
+                the reference point in preprocessing.
+            max_time - int - featurize up until this time index
+            min_time - int - featurize from reference_time + min_time index
+            use_last_timestep_results - bool - use the previous timesteps probas
+                as a feature while training/predicting (T)
+            features_pickle - str - file name for features.  NOTE: on_disk = False only
+            fold_features_pickle - str - file name for reduced, scaled training features
+                at each fold.  NOTE: on_disk = False only
+            fold_features_test_pickle - str - above for test set.
+            featurizer_pickle - str - file name to save featurizers.  NOTE: on_disk = False
+            featurizer_coldstart - bool - featurize data (T), or load features from
+                pickle (T)
+            scaler_pickle - str - file name to save scalers.  on_disk = False
+            scaler_coldstart - bool - scale features (T), or load scaled features
+            reducer_pickle - str - file name to save reducers. on_disk = False
+            reducer_coldstart - bool - reduce scaled features (T), or load reduced features
+            detection_model - str - model class for detetction.
+                'LR': LogisticRegression (sklearn)
+                'LRCV': LogisticRegressionCV (sklearn)
+                'RF': RandomForest (sklearn) - not yet implemented
+                'SVC': SVM Classifier - not yet implemented
+            detection_model_arguments - dict - dictionary of key, value pairs specific
+                to model type
+            detection_featurizer - str - class to use for extracting features for detection:
+                'poly': PolynomialFeaturizer (featurizer)
+                'sigmoid': KineticsFeaturizer
+                'kink': not implemented
+                'longitudinal': not implemented
+                'forecast': not implemented
+                None: use preprocessed raw data as features
+            detection_featurizer_arguments - dict - dictionary of key, value pairs specific
+                to featurizer type
+            detection_scaler - str - scaler class for scaling detection features
+                'SS': StandardScaler (sklearn)
+                None: data is not scaled
+            detection_scaler_arguments - dict - dictionary of key, value pairs specific
+                to scaler type
+            detetction_reducer - str - dimensionality reduction class for detection
+                'pca': PCA (sklearn)
+                None: no dimensionality reduction is performed
+            detection_reducer_arguments - dictionary of key, value pairs specific
+                to scaler type
+            gram_model - str - see detection_model for classes.  Additionally:
+                'detection': use same model class, argument as detection
+            gram_model_arguments - dict - dictionary of key, value pairs specific
+                to model type
+            ... < need to add gram, classification types info here >
+            nfolds - bool - number of cross validation folds
+            fold_size - float - size of each test fold (from zero to 1)
+        '''
         self.X = X
         self.y = y
 
@@ -106,19 +184,14 @@ class SeriesModel(object):
         self.trial_lengths = None
         self.number_of_columns = 220 # expected number of spots and colors + time
 
-        # self.models is a group of models for detection, gram, classification
+        # self.featurizers is a group of featurizers for detection, gram, classification
         # at each timepoint
         self.features = defaultdict(dict) # 10: [[np X n]]
-
         self.featurizers = defaultdict(dict)
-
-        # these are commented since now they get filled in cross_val method
-        # self.models = defaultdict(dict)
-        # self.scalers = defaultdict(dict)
-        # self.reducers = defaultdict(dict)
         self.times = []
 
-        # set base models and reducers
+        # set base models, featurizers, scalers, reducers and their arguments
+        # for each class
         self.detection_base_model = detection_model
         self.detection_base_reducer = detection_reducer
         self.detection_base_featurizer = detection_featurizer
@@ -149,9 +222,13 @@ class SeriesModel(object):
         self.classification_base_featurizer_arguments = classification_featurizer_arguments
         self.classification_base_scaler_arguments = classification_scaler_arguments
 
+        # stages for re-starting a job
         self.stages = ['setup', 'preprocess', 'featurize', 'pickle','scale', 'reduce', 'train']
+
     ### MAIN METHODS ###
     def __repr__(self):
+        # NOTE: needs debugging as some classes still cause error when trying to
+        # print
         for k, v in self.__dict__.iteritems():
             try:
                 if type(v) in [str, int, float, bool]:
@@ -164,60 +241,18 @@ class SeriesModel(object):
             except:
                 pass
 
-    def beyond(self, stage):
-        if self.load_state in self.stages:
-            # print stage, self.stages, self.load_state
-            decision = self.stages.index(stage) < self.stages.index(self.load_state)
-            # print decision
-            return decision
-        else:
-            return False
-    # ii) FILE IO #
-    def pts(self, x, piece, t=None, fold=None, file_name = None):
-        fname = self.make_fname(piece, t, fold)
-        if file_name:
-            fname = file_name
-        myfile = open(fname, 'wb')
-        ptf('Writing %s ...' % fname, self.logfile)
-        pickle.dump(x, myfile, -1)
-        myfile.close()
-        ptf('... Wrote %s' % fname, self.logfile)
-        return fname
-
-    def lts(self, piece, t=None, fold=None, file_name=None):
-        fname = self.make_fname(piece, t, fold)
-        if file_name:
-            fname = file_name
-        ptf('Loading %s ...' % fname, self.logfile)
-        myfile = open(fname, 'rb')
-        x = pickle.load(myfile)
-        myfile.close()
-        ptf('... Loaded %s' % fname, self.logfile)
-        return x
-
-    def tsdict(self, Xd, Xg, Xc):
-        return {'detection':Xd, 'gram': Xg, 'classification': Xc}
-
-    def mrt(self, times, tstart):
-        return [t for t in times if t >= tstart]
-
-    def make_fname(self, piece, t=-1, fold=-1):
-        if not os.path.exists('./' + self.runid):
-            os.makedirs('./' + self.runid)
-        fname = './' + self.runid + '/' + piece
-        if t>-1:
-            fname = './' + self.runid + '/' + piece + '_t_' + str(t)
-            if fold:
-                fname = './' + self.runid + '/' + piece + '_f_' + str(fold) + '_t_' + str(t)
-        elif fold>-1:
-            fname = './' + self.runid + '/' + piece + '_f_' + str(fold)
-        fname = fname + '.pkl'
-        return fname
-
-
-
     # i) SETUP #
     def setup(self, X, y):
+        '''
+        Inspects data to build crossvalidation folds, initialize results lists
+        and dicts, and build other helper lists and dicts
+
+        IN:
+            SeriesModel
+            X - pd dataframe - trial data.  see data structures.  Usually passed in to fit
+            y - pd dataframe - trial labels.  see data structures.  Usually passed in to fit
+        OUT: None
+        '''
         start = time.time()
         ptf('\n>> i. Setting-up SeriesModel ...', self.logfile)
         self.confusion_labels = self._build_confusion_labels(y)
@@ -231,6 +266,15 @@ class SeriesModel(object):
 
     # 0) PREPROCESS #
     def preprocess(self, X):
+        '''
+        Preprocesses raw data given conditions of color_scale, color_vector_type
+        passed to init.
+        IN:
+            SeriesModel
+            X - pd dataframe - trial data.  see data structures.  Usually passed in to fit
+        OUT:
+            X - pd dataframe - preprocessed trial data
+        '''
         if self.beyond('preprocess'):
             ptf('\n>> 0. Skipped Preprocessing << \n', self.logfile)
             return None
@@ -258,11 +302,24 @@ class SeriesModel(object):
         end = time.time()
         ptf('\n>> Prepocessing completed (%s seconds) <<' % (end-start), self.logfile)
         if self.on_disk:
-            self.pts(X, 'DI')
+            self.pickle_time_step(X, 'DI')
         return X
 
     # 1) FEATURIZE #
     def featurize(self, X, featurizer_pickle):
+        '''
+        Extracts features for detection, gram, classification from preprocessed
+        data using conditions passed to init.
+        IN:
+            SeriesModel
+            X - pd dataframe - preprocessed trial data
+            featurizer_pickle - str - file name to store featurizers
+                NOTE: if on_disk = True, pickles are stored at each timestep
+                using runid as filename prefix.
+        OUT:
+            X - dict of dict of np_arrays - scaled features (ntrials X nfeatures) for each
+                timestep (first key), and class(second key)
+        '''
         if self.beyond('featurize'):
             ptf('\n>> 1. Skipped Featurizing <<\n', self.logfile)
             return
@@ -302,7 +359,7 @@ class SeriesModel(object):
 
             else:
                 ts = self.tsdict(np_X_detection, np_X_gram, np_X_classification)
-                self.pts(ts, 'features', t)
+                self.pickle_time_step(ts, 'features', t)
 
         end = time.time()
         ptf('\n>> Featurizing completed (%s seconds) <<' % (end-start), self.logfile)
@@ -312,7 +369,7 @@ class SeriesModel(object):
             start = time.time()
             ptf('\n>> Pickling featurizers to %s ...' % featurizer_file_name, self.logfile)
 
-            self.pts(self.featurizers, 'featurizer', file_name = featurizer_file_name)
+            self.pickle_time_step(self.featurizers, 'featurizer', file_name = featurizer_file_name)
 
             end = time.time()
             ptf('\n>> Pickling completed (%s seconds) <<' % (end-start), self.logfile)
@@ -321,6 +378,20 @@ class SeriesModel(object):
 
     # 2) SCALE #
     def scale(self, X, scaler_pickle):
+        '''
+        Scales features for detection, gram, classification from features
+        using conditions passed to init.
+        IN:
+            SeriesModel
+            X - dict of np_arrays - features (ntrials X nfeatures) for each
+                timestep
+            scaler_pickle - str - file name to store scalers
+                NOTE: if on_disk = True, pickles are stored at each timestep, fold
+                using runid as filename prefix.
+        OUT:
+            X - dict of dict of dict of np_arrays - scaled features (ntrials X nfeatures) for each
+                timestep (first key), fold (second key) and class(third key)
+        '''
         if self.beyond('scale'):
             ptf('\n>> 2. Skipped Scaling <<\n', self.logfile)
             return
@@ -339,7 +410,7 @@ class SeriesModel(object):
             start = time.time()
             ptf('\n>> Pickling scalers to %s ...' % scaler_file_name, self.logfile)
 
-            self.pts(self.scalers, 'scaler', file_name = scaler_file_name)
+            self.pickle_time_step(self.scalers, 'scaler', file_name = scaler_file_name)
 
             end = time.time()
             ptf('\n>> Pickling completed (%s seconds) <<' % (end-start), self.logfile)
@@ -348,6 +419,20 @@ class SeriesModel(object):
 
     # 3) REDUCE #
     def reduce(self, X, reducer_pickle):
+        '''
+        Performs dimensionality reduction on scaled features for detection, gram,
+        classification from features using conditions passed to init.
+        IN:
+            SeriesModel
+            X - dict of np_arrays - features (ntrials X nfeatures) for each
+                timestep
+            scaler_pickle - str - file name to store scalers
+                NOTE: if on_disk = True, pickles are stored at each timestep, fold
+                using runid as filename prefix.
+        OUT:
+            X - dict of dict of dict of np_arrays - scaled features (ntrials X nfeatures) for each
+                timestep (first key), fold (second key) and class(third key)
+        '''
         if self.beyond('reduce'):
             ptf('\n>> 3. Skipped Reducing <<\n', self.logfile)
             return
@@ -362,7 +447,7 @@ class SeriesModel(object):
             reducer_file_name = reducer_pickle
             ptf('\n>> Pickling reducers to %s' % reducer_file_name, self.logfile)
 
-            self.pts(self.scalers, 'reducer', file_name = reducer_file_name)
+            self.pickle_time_step(self.scalers, 'reducer', file_name = reducer_file_name)
 
             end = time.time()
             ptf('\n>> Pickling completed (%s seconds) <<' % (end-start), self.logfile)
@@ -371,23 +456,40 @@ class SeriesModel(object):
 
     # 4) PICKLE/LOAD FEATURES #
     def pickle_features(self, data, features_pickle, ftype='features'):
+        '''
+        Stores features (usually a dictionary) in a pickle or passes for
+        self.on_disk = True (data stored at each fold, timestep in separate files)
+        IN:
+            SeriesModel
+            data - pd DataFrame or dict - data to be pickled
+            features_pickle - str - filename of pickle
+            ftype - str - type of file to save.  Arguments for pickle_time_step
+        OUT:
+            None
+        '''
         # pickle features
         if self.on_disk:
             ptf(' > pickled at each timestep & fold <')
             return
         else:
-            self.pts(data, ftype, file_name = features_pickle)
-            # features_file_name = features_pickle
-            # features_file = open(features_file_name, 'wb')
-            # pickle.dump(data, features_file, -1)
-            # features_file.close()
+            self.pickle_time_step(data, ftype, file_name = features_pickle)
 
     def load_features(self, features_pickle, ftype='features'):
+        '''
+        Loads features (usually a dictionary) from a pickle or passes for
+        self.on_disk = True (data loaded at each fold, timestep in separate files)
+        IN:
+            SeriesModel
+            features_pickle - str - filename of pickle
+            ftype - str - type of file to load.  Arguments for load_time_step
+        OUT:
+            data - pd DataFrame or dict - data to be pickled
+        '''
         if self.on_disk:
             ptf(' > will be loaded at each timestep & fold <')
             return
         else:
-            data = self.lts(ftype, file_name=features_pickle)
+            data = self.load_time_step(ftype, file_name=features_pickle)
             features_file_name = features_pickle
             features_file = open(features_file_name, 'rb')
             data = pickle.load(features_file)
@@ -396,6 +498,25 @@ class SeriesModel(object):
 
     # 5) TRAIN #
     def train(self, X, y, fold, t, use_last_timestep_results=False):
+        '''
+        Trains models for a timestep, fold for each label class (detection, gram,
+        classification)
+        IN:
+            SeriesModel
+            X - dict of nparrays - final features for fold, timestep (ntrials X nfeatures)
+            for each label class (key)
+            y - dict of nparrays - labels for this fold (ntrials) for each label class (key)
+            fold - int - fold index
+            t - int - time index
+            use_last_timestep_results - bool - use the previous timesteps probas
+                as a feature while training/predicting (T)
+        OUT:
+            models - tuple of models - models for each label class (d, g, c)
+            predictions - tuple of nparrays - predictions nparray (ntrials)
+                for each label class (d, g, c)
+            probabilities - tuple of nparrays - probabilites nparray (ntrial X classes)
+                for each labe class (d, g, c)
+        '''
         number_of_times = t
         (X_train_detection, X_train_gram, X_train_classification) = X
         (y_train_detection, y_train_gram, y_train_classification) = y
@@ -476,12 +597,31 @@ class SeriesModel(object):
             self.models[fold]['classification'][number_of_times] = model_classification
         else:
             ts = self.tsdict(model_detection, model_gram, model_classification)
-            self.pts(ts, 'models', t=number_of_times, fold=fold)
+            self.pickle_time_step(ts, 'models', t=number_of_times, fold=fold)
         return models, predictions, probabilities
 
 
     # 6) PREDICT #
     def predict(self, models, X_test, fold, t, use_last_timestep_results):
+        '''
+        Trains models for a timestep, fold for each label class (detection, gram,
+        classification)
+        IN:
+            SeriesModel
+            X - dict of nparrays - final features for fold, timestep (ntrials X nfeatures)
+            for each label class (key)
+            y - dict of nparrays - labels for this fold (ntrials) for each label class (key)
+            fold - int - fold index
+            t - int - time index
+            use_last_timestep_results - bool - use the previous timesteps probas
+                as a feature while training/predicting (T)
+        OUT:
+            models - tuple of models - models for each label class (d, g, c)
+            predictions - tuple of nparrays - predictions nparray (ntrials)
+                for each label class (d, g, c)
+            probabilities - tuple of nparrays - probabilites nparray (ntrial X classes)
+                for each labe class (d, g, c)
+        '''
         number_of_times = t
         (model_detection, model_gram, model_classification) = models
         (X_test_detection, X_test_gram, X_test_classification) = X_test
@@ -556,7 +696,7 @@ class SeriesModel(object):
             if self.verbose:
                 ptf( 'Scaling nt=%d ...' % number_of_times, self.logfile)
             if self.on_disk:
-                X = self.lts('features', t=t)
+                X = self.load_time_step('features', t=t)
             np_X_detection, np_X_gram, np_X_classification = self._scale_one_timestep(X, t, fold)
 
             if self.debug:
@@ -573,9 +713,9 @@ class SeriesModel(object):
                 self.fold_features_test[fold]['classification'][t] = np_X_classification[1]
             else:
                 ts = self.tsdict(np_X_detection[0], np_X_gram[0], np_X_classification[0])
-                self.pts(ts, 'scaleds', t=t, fold=fold)
+                self.pickle_time_step(ts, 'scaleds', t=t, fold=fold)
                 ts = self.tsdict(np_X_detection[1], np_X_gram[1], np_X_classification[1])
-                self.pts(ts, 'scaleds_test', t=t, fold=fold)
+                self.pickle_time_step(ts, 'scaleds_test', t=t, fold=fold)
 
         end = time.time()
 
@@ -611,9 +751,9 @@ class SeriesModel(object):
                 self.fold_features_test[fold]['classification'][t] = np_X_classification[1]
             else:
                 ts = self.tsdict(np_X_detection[0], np_X_gram[0], np_X_classification[0])
-                self.pts(ts, 'reduceds', t=t, fold=fold)
+                self.pickle_time_step(ts, 'reduceds', t=t, fold=fold)
                 ts = self.tsdict(np_X_detection[1], np_X_gram[1], np_X_classification[1])
-                self.pts(ts, 'reduceds_test', t=t, fold=fold)
+                self.pickle_time_step(ts, 'reduceds_test', t=t, fold=fold)
         end = time.time()
         if self.verbose:
             ptf('\n> Reducing fold %d completed (%s seconds) <<' % (fold,(end-start)), self.logfile)
@@ -672,7 +812,7 @@ class SeriesModel(object):
         # store featurizers
         if self.on_disk:
             ts = self.tsdict(detection_featurizer, gram_featurizer, classification_featurizer)
-            self.pts(ts, 'featurizer', number_of_times)
+            self.pickle_time_step(ts, 'featurizer', number_of_times)
         else:
             self.featurizers['detection'][number_of_times] = detection_featurizer
             self.featurizers['gram'][number_of_times] = gram_featurizer
@@ -682,7 +822,7 @@ class SeriesModel(object):
     # 2) SCALE #
     def _subset_fold(self, X, fold, result_type, number_of_times, test_train='train'):
         if self.on_disk:
-            # X = self.lts('features', t=number_of_times)
+            # X = self.load_time_step('features', t=number_of_times)
             X_test_train = X[result_type]
         else:
             X_test_train = X[result_type][number_of_times]
@@ -746,7 +886,7 @@ class SeriesModel(object):
 
         if self.on_disk:
             ts = self.tsdict(detection_scaler, gram_scaler, classification_scaler)
-            self.pts(ts, 'scaler', t=number_of_times, fold=fold)
+            self.pickle_time_step(ts, 'scaler', t=number_of_times, fold=fold)
         else:
             self.scalers[fold]['detection'][number_of_times] = detection_scaler
             self.scalers[fold]['gram'][number_of_times] = gram_scaler
@@ -761,8 +901,8 @@ class SeriesModel(object):
     # 3) REDUCE #
     def _reduce_one_timestep(self, X_train, number_of_times, fold):
         if self.on_disk:
-            X_train = self.lts('scaleds', t=number_of_times, fold=fold)
-            X_test =  self.lts('scaleds_test', t=number_of_times, fold=fold)
+            X_train = self.load_time_step('scaleds', t=number_of_times, fold=fold)
+            X_test =  self.load_time_step('scaleds_test', t=number_of_times, fold=fold)
             X_detection_train = X_train['detection']
             X_gram_train = X_train['gram']
             X_classification_train = X_train['classification']
@@ -829,7 +969,7 @@ class SeriesModel(object):
             self.reducers[fold]['classification'][number_of_times] = classification_reducer
         else:
             ts = self.tsdict(detection_reducer, gram_reducer, classification_reducer)
-            self.pts(ts, 'reducer', t=number_of_times, fold=fold)
+            self.pickle_time_step(ts, 'reducer', t=number_of_times, fold=fold)
 
         X_reduceds = [(X_detection_reduced, X_detection_test_reduced),
             (X_gram_reduced, X_gram_test_reduced),
@@ -1194,6 +1334,59 @@ class SeriesModel(object):
 
 
     ### UTILITY METHODS ###
+    def beyond(self, stage):
+        # Determines if given stage is beyond the load_state
+        if self.load_state in self.stages:
+            decision = self.stages.index(stage) < self.stages.index(self.load_state)
+            return decision
+        else:
+            return False
+
+    # ii) FILE IO #
+    def pickle_time_step(self, x, piece, t=None, fold=None, file_name = None):
+        fname = self.make_fname(piece, t, fold)
+        if file_name:
+            fname = file_name
+        myfile = open(fname, 'wb')
+        ptf('Writing %s ...' % fname, self.logfile)
+        pickle.dump(x, myfile, -1)
+        myfile.close()
+        ptf('... Wrote %s' % fname, self.logfile)
+        return fname
+
+    def load_time_step(self, piece, t=None, fold=None, file_name=None):
+        fname = self.make_fname(piece, t, fold)
+        if file_name:
+            fname = file_name
+        ptf('Loading %s ...' % fname, self.logfile)
+        myfile = open(fname, 'rb')
+        x = pickle.load(myfile)
+        myfile.close()
+        ptf('... Loaded %s' % fname, self.logfile)
+        return x
+
+    def tsdict(self, Xd, Xg, Xc):
+        return {'detection':Xd, 'gram': Xg, 'classification': Xc}
+
+    def mrt(self, times, tstart):
+        return [t for t in times if t >= tstart]
+
+    def make_fname(self, piece, t=-1, fold=-1):
+        if not os.path.exists('./' + self.runid):
+            os.makedirs('./' + self.runid)
+        fname = './' + self.runid + '/' + piece
+        if t>-1:
+            fname = './' + self.runid + '/' + piece + '_t_' + str(t)
+            if fold:
+                fname = './' + self.runid + '/' + piece + '_f_' + str(fold) + '_t_' + str(t)
+        elif fold>-1:
+            fname = './' + self.runid + '/' + piece + '_f_' + str(fold)
+        fname = fname + '.pkl'
+        return fname
+
+
+
+    # data slicing functions #
     def _subset_data(self, Z, number_of_times):
         z_sub = Z.copy()
         z_sub= z_sub.apply(lambda x: x[0:number_of_times])
@@ -1322,9 +1515,9 @@ class SeriesModel(object):
             Xc = self._subset_fold_X_class(fold, test_train, result_type = 'classification', t=t)
         else:
             if test_train == 'train':
-                X_test_train = self.lts('reduceds', t=t, fold=fold)
+                X_test_train = self.load_time_step('reduceds', t=t, fold=fold)
             else:
-                X_test_train = self.lts('reduceds_test', t=t, fold=fold)
+                X_test_train = self.load_time_step('reduceds_test', t=t, fold=fold)
             Xd = X_test_train['detection']
             Xg = X_test_train['gram']
             Xc = X_test_train['classification']
@@ -1380,7 +1573,7 @@ class SeriesModel(object):
         else:
             self.times = np.arange(t, self.max_time, 1)
 
-        # i) SETUP # GOOD
+        # i) SETUP #
         self.setup(X,y)
 
         # Check trial integrity
@@ -1417,7 +1610,6 @@ class SeriesModel(object):
 
 
         if self.scaler_coldstart or self.reducer_coldstart:
-            print 'Here I AM'
             # 2) SCALE - step by timestep and by fold
             X_scaled = self.scale(X_featurized, self.scaler_pickle)
             # 3) REDUCE - step by timestep and by fold
