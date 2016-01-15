@@ -389,8 +389,8 @@ class SeriesModel(object):
                 NOTE: if on_disk = True, pickles are stored at each timestep, fold
                 using runid as filename prefix.
         OUT:
-            X - dict of dict of dict of np_arrays - scaled features (ntrials X nfeatures) for each
-                timestep (first key), fold (second key) and class(third key)
+            X - dict of dict of dict of np_arrays - scaled features (ntrials X nfeatures)
+            for each fold (first key), class (second key), timestep (third key)
         '''
         if self.beyond('scale'):
             ptf('\n>> 2. Skipped Scaling <<\n', self.logfile)
@@ -430,8 +430,8 @@ class SeriesModel(object):
                 NOTE: if on_disk = True, pickles are stored at each timestep, fold
                 using runid as filename prefix.
         OUT:
-            X - dict of dict of dict of np_arrays - scaled features (ntrials X nfeatures) for each
-                timestep (first key), fold (second key) and class(third key)
+            X - dict of dict of dict of np_arrays - reduced features (ntrials X nfeatures)
+            for each fold (first key), class (second key), timestep (third key)
         '''
         if self.beyond('reduce'):
             ptf('\n>> 3. Skipped Reducing <<\n', self.logfile)
