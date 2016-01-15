@@ -383,8 +383,8 @@ class SeriesModel(object):
         using conditions passed to init.
         IN:
             SeriesModel
-            X - dict of np_arrays - features (ntrials X nfeatures) for each
-                timestep
+            X - dict of dict of np_arrays - features (ntrials X nfeatures) for each
+                timestep (second key), label class (first key)
             scaler_pickle - str - file name to store scalers
                 NOTE: if on_disk = True, pickles are stored at each timestep, fold
                 using runid as filename prefix.
@@ -685,6 +685,18 @@ class SeriesModel(object):
 
     # 2) SCALE #
     def _scale_one_fold(self, X, fold):
+        '''
+        Scales features for detection, gram, classification for all timesteps of
+        a given fold.
+        IN:
+            SeriesModel
+            X - dict of dict of np_arrays - features (ntrials X nfeatures) for each
+                timestep (second key), label class (first key)
+            fold - int - fold index
+        OUT:
+            None - results (features and scalers ) are saved to disk (self.on_disk
+                = True) or stored in self.fold_features, self.fold_features_test
+        '''
         start = time.time()
         if self.verbose:
             ptf('\n> Scaling fold %d ...' % fold, self.logfile)
@@ -829,12 +841,24 @@ class SeriesModel(object):
         return X_test_train
 
     def _scale_one_timestep(self, X, number_of_times, fold):
+        '''
+        Scales features for detection, gram, classification for a given fold,
+        timestep.
+        IN:
+            SeriesModel
+            X - dict of dict of np_arrays - features (ntrials X nfeatures) for each
+                timestep (second key), label class (first key)
+            number_of_times - int - timestep index
+            fold - int - fold index
+        OUT:
+            X_scaleds - list of tuples of nparrays - for each label class (first
+                index), the train and test scaled features (second index) as
+                np_arrays (ntrials X nfeatures):
+                    [(X_detection_scaled, X_test_detection_scaled),
+                    (X_gram_scaled, X_test_gram_scaled),
+                    (X_classification_scaled, X_test_classification_scaled)]
+        '''
         start = time.time()
-
-        # pick just the data we need for this fold
-
-        # X_train_detection = X_train['detection'][number_of_times]
-        # X_train_detection = X_train_detection[self.folds[fold]['train']]
 
         # detection
         X_train_detection = self._subset_fold(X, fold, 'detection', number_of_times, 'train')
