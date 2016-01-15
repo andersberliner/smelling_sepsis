@@ -503,18 +503,18 @@ class SeriesModel(object):
         classification)
         IN:
             SeriesModel
-            X - dict of nparrays - final features for fold, timestep (ntrials X nfeatures)
+            X - dict of nparrays - final features for this train fold, timestep (ntrials X nfeatures)
             for each label class (key)
-            y - dict of nparrays - labels for this fold (ntrials) for each label class (key)
+            y - dict of nparrays - labels for this train fold (ntrials) for each label class (key)
             fold - int - fold index
             t - int - time index
             use_last_timestep_results - bool - use the previous timesteps probas
                 as a feature while training/predicting (T)
         OUT:
             models - tuple of models - models for each label class (d, g, c)
-            predictions - tuple of nparrays - predictions nparray (ntrials)
+            predictions - tuple of nparrays - train predictions nparray (ntrials)
                 for each label class (d, g, c)
-            probabilities - tuple of nparrays - probabilites nparray (ntrial X classes)
+            probabilities - tuple of nparrays - train probabilites nparray (ntrial X classes)
                 for each labe class (d, g, c)
         '''
         number_of_times = t
@@ -604,22 +604,21 @@ class SeriesModel(object):
     # 6) PREDICT #
     def predict(self, models, X_test, fold, t, use_last_timestep_results):
         '''
-        Trains models for a timestep, fold for each label class (detection, gram,
+        Makes predictions for a timestep, fold for each label class (detection, gram,
         classification)
         IN:
             SeriesModel
-            X - dict of nparrays - final features for fold, timestep (ntrials X nfeatures)
+            models - tuple of models - models for each label class (d, g, c)
+            X_test - dict of nparrays - final features for test fold, timestep (ntrials X nfeatures)
             for each label class (key)
-            y - dict of nparrays - labels for this fold (ntrials) for each label class (key)
             fold - int - fold index
             t - int - time index
             use_last_timestep_results - bool - use the previous timesteps probas
-                as a feature while training/predicting (T)
+                as a feature while predicting (T)
         OUT:
-            models - tuple of models - models for each label class (d, g, c)
-            predictions - tuple of nparrays - predictions nparray (ntrials)
+            predictions - tuple of nparrays - test predictions nparray (ntrials)
                 for each label class (d, g, c)
-            probabilities - tuple of nparrays - probabilites nparray (ntrial X classes)
+            probabilities - tuple of nparrays - test probabilites nparray (ntrial X classes)
                 for each labe class (d, g, c)
         '''
         number_of_times = t
