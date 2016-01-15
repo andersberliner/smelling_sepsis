@@ -41,12 +41,12 @@ RUNID = 'run001'
 LOGFILENAME = 'log_%s_%s.txt' % (RUNID, START_DT_STR)
 MODELFILENAME = 'sm'
 # LOGFILENAME = None
-pickle_data = True # save loaded data to a pickle for greater loading efficiency
+pickle_data = False # save loaded data to a pickle for greater loading efficiency
 unittests = False
-profile = True # do memory profiling
+profile = False # do memory profiling
 verbose = True # how much output
-debug = True # subset timeseries
-reload_data = True # use pickled data or load from folders
+debug = False # subset timeseries
+reload_data = False # use pickled data or load from folders
 n_cpus = multiprocessing.cpu_count()
 
 def ascii_encode_dict(data):
