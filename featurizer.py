@@ -343,3 +343,16 @@ class LongitudinalFeaturizer(object):
 
     def fit_transform(self, X):
         pass
+
+class SlopeFeaturizer(object):
+    def __init__(self, order, reference_time=0, verbose=False, logfile=None):
+        pass
+
+    def fit_transform(self, X):
+        pass
+
+    def predict(self, X):
+        pass
+
+    def _regress(self, X):
+        pass

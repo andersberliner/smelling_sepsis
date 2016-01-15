@@ -38,7 +38,6 @@ PICKLE_NAMES = ['Xdf.pkl', 'ydf.pkl', 'used_column_headers.pkl']
 
 ### RUN CONDITIONS ###
 RUNID = 'run001'
-LOGFILENAME = 'log_%s_%s.txt' % (RUNID, START_DT_STR)
 MODELFILENAME = 'sm'
 # LOGFILENAME = None
 pickle_data = True # save loaded data to a pickle for greater loading efficiency
@@ -66,6 +65,8 @@ if __name__ == '__main__':
     else:
         print 'NOTE: you can specify folder, json name on command line'
         print 'Using default: %s' % RUNID
+
+    LOGFILENAME = 'log_%s_%s.txt' % (RUNID, START_DT_STR)    
 
     # creates a directory to store this runs work
     if not os.path.exists('./' + RUNID):
