@@ -160,7 +160,7 @@ def classification_report_ovr(yt, yp, labels, s1=11, s2=10):
                                                 F1.rjust(10),
                                                 TO.rjust(10),
                                                 AC.rjust(10))
-
+    report += '\nOverall Accuracy: %0.3f\n' % accuracy_score(yt,yp)
     return report
 
 #

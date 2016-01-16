@@ -47,7 +47,7 @@ class SpotTimePlot(object):
         else:
             self.averages = False
 
-        self.plot_raw(spot=spot, averages=self.averages)
+        self.plot_raw(spot=spot, averages=self.averages, grouptype=self.cradio.value_selected)
 
     def get_column_index(self, column_name):
         # may not be necessary
@@ -152,7 +152,7 @@ class SpotTimePlot(object):
         # spot slider
         axcolor = 'lightgoldenrodyellow'
         self.axspot = plt.axes([0.25, 0.05, 0.65, 0.03], axisbg=axcolor)
-        self.sspot = Slider(self.axspot, 'Spot', 1, len(self.column_headers), valinit=1)
+        self.sspot = Slider(self.axspot, 'Spot', 0, len(self.column_headers), valinit=1)
         self.sspot.on_changed(self.update_raws)
 
         # averages button
@@ -164,11 +164,18 @@ class SpotTimePlot(object):
         self.radio = RadioButtons(self.rax, ('averages', 'all'), active=0)
         self.radio.on_clicked(self.update_raws)
 
+        grouptypes = [k for k in self.y.columns.values]
+        print grouptypes
+        # left, bottom, width, height
+        self.cax = plt.axes([0.025, 0.80, 0.15, 0.15], axisbg=axcolor)
+        self.cradio = RadioButtons(self.cax, grouptypes, active=0)
+        self.cradio.on_clicked(self.update_raws)
+
         # self.trial_groups = self.split_trial_groups()
         self.X = X
         # self.X_pred = X_pred
         self.averages = averages
-        self.plot_raw(spot=1, group=0, trial=0, averages=averages)
+        self.plot_raw(spot=1, grouptype=self.y.columns[0], averages=averages)
         plt.show()
 
     def one_spot(self, x, spot):
@@ -176,32 +183,40 @@ class SpotTimePlot(object):
         raw = x[:,spot]
         # print raw.shape
         return raw
-    def plot_raw(self, spot=1, group=0, trial=0, averages=True):
+
+    def plot_raw(self, spot=1, grouptype='classification', averages=True):
         raw_trials = self.X
         # print len(raw_trials), len(self.y)
         # print self.groups
-        print self.averages, self.radio.value_selected
+        print spot, grouptype, self.averages, self.radio.value_selected, self.cradio.value_selected
         # pred_trials = self.X_pred
         labels = self.y
         plt.sca(self.ax)
         plt.cla()
 
+        if grouptype not in self.y.columns.values:
+            print 'Unknown grouptype %s' % grouptype
+            return
+
+
+        groups = self.y[grouptype].unique()
+
         t = self.X.iloc[0][:,0]
-        for i, group in enumerate(self.groups):
-            # print group
+        for i, group in enumerate(groups):
+            print group
             # get only those with right label => group
             # print self.groups[group]
             # print self.groups
             # print labels['classification']
             mask = labels['classification'] == group
             grp_trials = raw_trials[mask]
-            # pred_trials = pred_trials[mask]
-            # print len(grp_trials)
+
+            print len(grp_trials)
             C = grp_trials.apply(lambda x: self.one_spot(x, spot))
             if averages:
 
-                # print C.head()
-                # print C
+                print C.head()
+                print C
                 AVG = np.array(C.iloc[0])
                 # print AVG
                 for i in xrange(1, len(C)):
@@ -229,6 +244,6 @@ class SpotTimePlot(object):
                         else:
                             plt.plot(t, data, color=self.colors[i], alpha=0.3)
 
-        plt.title(('S:%s, averages:%s' % (self.get_column_name(spot),self.averages)))
+        plt.title(('S:%s, averages:%s, labeltype:%s' % (self.get_column_name(spot),self.averages), grouptype))
         # plt.ylim([-200,200])
         plt.legend(loc=0, fontsize=6)

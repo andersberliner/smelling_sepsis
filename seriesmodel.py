@@ -8,7 +8,10 @@ Contains the series model class.
 '''
 import pandas as pd
 import numpy as np
-from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
+from sklearn.metrics import accuracy_score
+from sklearn.linear_model import LogisticRegression, LogisticRegressionCV, SGDClassifier
+from sklearn.svm import LinearSVC, SVC
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.cross_validation import StratifiedShuffleSplit
@@ -20,6 +23,7 @@ import time
 from functools import partial
 import pickle
 import os
+from nonetype import NoneTypeScaler, NoneTypeReducer, NoneTypeFeaturizer
 
 from output_capstone import print_to_file_and_terminal as ptf
 
@@ -229,14 +233,16 @@ class SeriesModel(object):
     def __repr__(self):
         # NOTE: needs debugging as some classes still cause error when trying to
         # print
+        output = ''
         keys = self.__dict__.keys()
         keys.sort()
         for k in keys:
             v = self.__dict__[k]
             if type(v) in [str, int, float, bool]:
-                print k, ':', v
+                output += '\n%s: %s' % (k, v)
             else:
-                print k, ':', str(type(v))
+                output += '\n%s: %s' % (k, type(v))
+        return output
 
     # i) SETUP #
     def setup(self, X, y):
@@ -363,6 +369,7 @@ class SeriesModel(object):
 
         # pickle featurizers
         if not self.on_disk:
+            featurizer_file_name = featurizer_pickle
             start = time.time()
             ptf('\n>> Pickling featurizers to %s ...' % featurizer_file_name, self.logfile)
 
@@ -404,6 +411,7 @@ class SeriesModel(object):
 
         # pickle scalers
         if not self.on_disk:
+            scaler_file_name = scaler_pickle
             start = time.time()
             ptf('\n>> Pickling scalers to %s ...' % scaler_file_name, self.logfile)
 
@@ -655,13 +663,13 @@ class SeriesModel(object):
             ptf( 'Predicting classification fold:%d, nt=%d ...' % (fold, number_of_times), self.logfile)
 
         np_X_classification = np.hstack((X_test_classification,
-            y_probabilities_detection[:,1].reshape(-1,1),
-            y_probabilities_gram[:,:-1]))
+        y_probabilities_detection[:,1].reshape(-1,1),
+        y_probabilities_gram[:,:-1]))
 
         if use_last_timestep_results:
             # append probas of all non-control classes
             np_X_classification = np.hstack((np_X_classification,
-                self.fold_probabilities[fold]['classification'][:,1:]))
+                self.fold_probabilities_test[fold]['classification'][:,1:]))
 
         y_predict_classification = model_classification.predict(np_X_classification)
         y_probabilities_classification = model_classification.predict_proba(np_X_classification)
@@ -857,14 +865,12 @@ class SeriesModel(object):
                     (X_classification_scaled, X_test_classification_scaled)]
         '''
         start = time.time()
-
         # detection
         X_train_detection = self._subset_fold(X, fold, 'detection', number_of_times, 'train')
         X_detection_scaled, detection_scaler = self._scale_class(
             X_train_detection,
             self.detection_base_scaler,
             self.detection_base_scaler_arguments)
-
 
         X_test_detection = self._subset_fold(X, fold, 'detection', number_of_times, 'test')
         X_test_detection_scaled = detection_scaler.transform(X_test_detection)
@@ -1054,9 +1060,6 @@ class SeriesModel(object):
             y_predict_gram = yp['gram']
             y_predict_classification = yp['classification']
 
-            print testtrain_type
-            print len(y_true_detection), len(y_true_gram), len(y_true_classification)
-            print len(y_predict_detection), len(y_predict_gram), len(y_predict_classification)
 
             if self.verbose:
                 # print np.unique(y_predict_detection)
@@ -1081,7 +1084,8 @@ class SeriesModel(object):
             cm = mcm.confusion_matrix_binary(y_true_detection, y_predict_detection)
             # print cm
             # detection - populate scores
-            score_dict = self._populate_score_dict(cm, scores, number_of_times)
+            overall_acc = accuracy_score(y_true_detection, y_predict_detection)
+            score_dict = self._populate_score_dict(cm, scores, number_of_times, overall_acc)
             # self.scores['detection'] = self.scores['detection'].append(score_dict, ignore_index=True)
 
             # figure out how to append one set of scores
@@ -1100,29 +1104,32 @@ class SeriesModel(object):
                 results = mcm.results_ovr(truths, predictions, labels)
                 scores = mcm.scores_ovr(truths, predictions, labels)
                 micros, macros = mcm.micro_macro_scores(results)
-
+                overall_acc = accuracy_score(truths, predictions)
                 # add results for each label
                 for i, label in enumerate(labels):
                     label_cm = mcm.confusion_matrix_ovr(*results[i,:])
-                    score_dict = self._populate_score_dict(label_cm, scores[i,:], number_of_times)
+                    score_dict = self._populate_score_dict(label_cm, scores[i,:],
+                        number_of_times, overall_acc)
                     # self.scores[result_type][label].append(score_dict, ignore_index=True)
                     if testtrain_type == 'train':
                         self._append_row_to_df(self.scores[result_type][label], score_dict)
                     else:
                         self._append_row_to_df(self.scores_test[result_type][label], score_dict)
 
-                score_dict = self._populate_score_dict(cm, micros, number_of_times)
-                score_dict = self._populate_score_dict(cm, macros, number_of_times)
+                score_dict_micro = self._populate_score_dict(cm, micros,
+                    number_of_times, overall_acc)
+                score_dict_macro = self._populate_score_dict(cm, macros,
+                    number_of_times, overall_acc)
 
                 if testtrain_type == 'train':
                     # self.scores[result_type]['micro'].append(score_dict, ignore_index=True)
-                    self._append_row_to_df(self.scores[result_type]['micro'], score_dict)
+                    self._append_row_to_df(self.scores[result_type]['micro'], score_dict_micro)
 
                     # self.scores[result_type]['macro'].append(score_dict, ignore_index=True)
-                    self._append_row_to_df(self.scores[result_type]['macro'], score_dict)
+                    self._append_row_to_df(self.scores[result_type]['macro'], score_dict_macro)
                 else:
-                    self._append_row_to_df(self.scores_test[result_type]['micro'], score_dict)
-                    self._append_row_to_df(self.scores_test[result_type]['macro'], score_dict)
+                    self._append_row_to_df(self.scores_test[result_type]['micro'], score_dict_micro)
+                    self._append_row_to_df(self.scores_test[result_type]['macro'], score_dict_macro)
 
 
     ## one_class methods ##
@@ -1131,7 +1138,8 @@ class SeriesModel(object):
     def _featurize_class(self, X_train, featurizer_type, featurizer_arguments):
         X_features = X_train.copy()
         if not featurizer_type:
-            return X_features, None
+            # return X_features, None
+            featurizer = NoneTypeFeaturizer()
 
         if featurizer_type == 'poly':
             featurizer_arguments['reference_time'] = self.reference_time
@@ -1171,25 +1179,26 @@ class SeriesModel(object):
         X = X.copy()
 
         if not scaler_type:
-            return X, None
+            scaler = NoneTypeScaler()
 
         if scaler_type == 'SS':
-            ss = StandardScaler(**scaler_arguments)
+            scaler = StandardScaler(**scaler_arguments)
             # featurizer = PolynomialFeaturizer(**featurizer_arguments)
 
-        X_scaled = ss.fit_transform(X)
-        return X_scaled, ss
+        X_scaled = scaler.fit_transform(X)
+        return X_scaled, scaler
 
     # 3) REDUCE #
     def _reduce_class(self, X_train, reducer_type, reducer_arguments):
         X_features = X_train.copy()
         if not reducer_type:
-            return X_features, None
+            reducer = NoneTypeReducer()
 
-        if reducer_type == 'pca':
+        elif reducer_type == 'pca':
             reducer = PCA(**reducer_arguments)
         else:
             ptf('*** Unknown reducer_type %s.  No transformations done ***' % reducer_type, self.logfile)
+            reducer = NoneTypeReducer()
 
         X_features = reducer.fit_transform(X_train)
 
@@ -1200,15 +1209,21 @@ class SeriesModel(object):
     # 5) TRAIN #
 
     # 6) PREDICT #
-    def _fit_class(self, X_train, y_train, model_type, model_argmuents, step=None):
+    def _fit_class(self, X_train, y_train, model_type, model_arguments, step=None):
         if model_type == 'LR':
-            model = LogisticRegression(**model_argmuents)
+            model = LogisticRegression(**model_arguments)
         elif model_type == 'LRCV':
-            model = LogisticRegressionCV(**model_argmuents)
+            model = LogisticRegressionCV(**model_arguments)
         elif model_type == 'RF':
-            pass
+            model = RandomForestClassifier(**model_arguments)
         elif model_type == 'SVM':
-            pass
+            model = SVC(**model_arguments)
+        elif model_type == 'LinearSVC':
+            # note - need error handling since no predict_proba
+            model = LinearSVC(**model_arguments)
+        elif model_type == 'SGD':
+            # note - need error handling since no predict_proba
+            model = SGDClassifier(**model_arguments)
         elif model_type == 'longitudinal':
             pass
         else:
@@ -1264,7 +1279,7 @@ class SeriesModel(object):
         self.scores = {}
         self.scores_test = {}
         df_columns = ['time']
-        self.metrics = ['confusion_matrix', 'accuracy', 'precision', 'recall', 'f1']
+        self.metrics = ['confusion_matrix', 'accuracy', 'precision', 'recall', 'f1', 'overall_accuracy']
         df_columns.extend(self.metrics)
         for label, label_list in self.confusion_labels.iteritems():
             if label == 'detection':
@@ -1410,7 +1425,7 @@ class SeriesModel(object):
         z_sub= z_sub.apply(lambda x: x[0:number_of_times])
         return z_sub
 
-    def _populate_score_dict(self, cm, results, number_of_times):
+    def _populate_score_dict(self, cm, results, number_of_times, overall_acc='NA'):
         score_dict = {}
         score_dict['time'] = number_of_times
         score_dict['confusion_matrix'] = cm
@@ -1418,6 +1433,8 @@ class SeriesModel(object):
         score_dict['precision'] = results[1]
         score_dict['recall'] = results[2]
         score_dict['f1'] = results[3]
+        # RETURN TO THIS #
+        score_dict['overall_accuracy'] = overall_acc
 
         return score_dict
     def _get_fold(self, X, fold, time):
@@ -1583,7 +1600,9 @@ class SeriesModel(object):
         # don't use results for the first model made
         use_last_timestep_results = False
         if debug:
-            self.times = [30,40,50]
+            ## come back here ##
+            self.times = [15,16]
+            # self.times = [30,40,50]
         else:
             self.times = np.arange(t, self.max_time, 1)
 
@@ -1676,7 +1695,6 @@ class SeriesModel(object):
 
                 # 6) PREDICT
                 test_predictions, test_probabilities = self.predict(models, X_test, fold, t, use_last_timestep_results)
-
                 # accumulate y_pred_train, y_true_train
                 results = (
                     y_train,
