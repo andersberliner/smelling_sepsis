@@ -25,6 +25,20 @@ class PolynomialFeaturizer(object):
         self.gridsearch = gridsearch
         self.n_jobs = n_jobs
 
+    def __repr__(self):
+        # NOTE: needs debugging as some classes still cause error when trying to
+        # print
+        output = ''
+        keys = self.__dict__.keys()
+        keys.sort()
+        for k in keys:
+            v = self.__dict__[k]
+            if type(v) in [str, int, float, bool]:
+                output += '\n%s: %s' % (k, v)
+            else:
+                output += '\n%s: %s' % (k, type(v))
+        return output
+
     def fit(self, X):
         pass
 
@@ -159,6 +173,20 @@ class KineticsFeaturizer(object):
         self.xtol = xtol
         self.gtol = gtol
         self.maxfev = maxfev
+
+    def __repr__(self):
+        # NOTE: needs debugging as some classes still cause error when trying to
+        # print
+        output = ''
+        keys = self.__dict__.keys()
+        keys.sort()
+        for k in keys:
+            v = self.__dict__[k]
+            if type(v) in [str, int, float, bool]:
+                output += '\n%s: %s' % (k, v)
+            else:
+                output += '\n%s: %s' % (k, type(v))
+        return output
 
     def sigmoid(self, t,A,k,C):
         y = 1./(A + np.exp(-(k*t + C)))
@@ -339,12 +367,27 @@ class KinkFeaturizer(object):
         return coef_, scores_
 
 class DerivativeFeaturizer(object):
-    def __init__(self, order=1, dx=1.0, reference_time=0, verbose=False, logfile=None):
+    def __init__(self, order=1, dx=1.0, reference_time=0, maxmin=False, verbose=False, logfile=None):
         self.order = order
         self.reference_time = reference_time
         self.verbose = verbose
         self.logfile = logfile
         self.dx = dx
+        self.maxmin = maxmin # if the max or min deriv should be returned as the feature
+
+    def __repr__(self):
+        # NOTE: needs debugging as some classes still cause error when trying to
+        # print
+        output = ''
+        keys = self.__dict__.keys()
+        keys.sort()
+        for k in keys:
+            v = self.__dict__[k]
+            if type(v) in [str, int, float, bool]:
+                output += '\n%s: %s' % (k, v)
+            else:
+                output += '\n%s: %s' % (k, type(v))
+        return output
 
     def fit_transform(self, X):
         Xp_, scores_ = self._regress(X)
@@ -366,8 +409,12 @@ class DerivativeFeaturizer(object):
                 if self.verbose:
                     ptf( 'Taking derivatives of trial %d'%  trial_index, self.logfile)
             number_of_times = len(x)
-            Xp = np.zeros((number_of_times, number_of_spots))
-            scores = np.zeros(number_of_spots)
+            if self.maxmin:
+                Xp = np.zeros((1, number_of_spots))
+            else:
+                Xp = np.zeros((number_of_times, number_of_spots))
+            trigger_times = np.zeros(number_of_spots)
+
             # print x.shape, number_of_times, number_of_spots, Xp.shape, scores.shape
             for column_index in np.arange(x.shape[1]):
                 spot_index = column_index - 1
@@ -385,8 +432,11 @@ class DerivativeFeaturizer(object):
                     # print fp.shape, Xp[:, spot_index].shape
                     # return the trigger time as the other feature instead of a score
                     scores[spot_index] = x[np.argmax(np.abs(fp)),0]
-                    Xp[:,spot_index] = fp.flatten()
-                    Xp[:self.reference_time, spot_index] = 0
+                    if self.maxmin:
+                        Xp[0, spot_index] = np.max(np.abs(fp))
+                    else:
+                        Xp[:,spot_index] = fp.flatten()
+                        Xp[:self.reference_time, spot_index] = 0
                     # scores[spot_index] = score
             Xp_.iloc[trial_index] = Xp
             scores_.iloc[trial_index] = scores

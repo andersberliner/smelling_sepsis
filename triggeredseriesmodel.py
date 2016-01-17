@@ -27,9 +27,7 @@ from nonetype import NoneTypeScaler, NoneTypeReducer, NoneTypeFeaturizer
 
 from output_capstone import print_to_file_and_terminal as ptf
 
-import utils_seriesmodel as usm
-
-class SeriesModel(object):
+class TriggeredSeriesModel(object):
     def __init__(self, logfile=None,
                     X=None, y=None,
                     on_disk = True, # whether to keep results in memory or write to disk after each timestep
@@ -38,7 +36,7 @@ class SeriesModel(object):
                     runid = 'output',
                     color_scale = 'RGB',
                     color_vector_type = 'DII',
-                    trigger = False,
+                    trigger_threshold = 0.5,
                     trigger_pickle = 'triggers.pickle',
                     reference_time = 0,
                     max_time = 60, # 20 hrs max
@@ -101,8 +99,8 @@ class SeriesModel(object):
                 'RBG', 'CSV' (not implemented)
             color_vector_type - str - preprocess data as raw 'I', differences 'DI',
                 or percent differences 'DII'
-            trigger - bool - whether to adjust the time-scale once detection
-                threshold is crossed for classification and gram
+            trigger_threshold - float - probability (from 0 to 1) at which to classify a
+                sample as positive for the detection step
             trigger_pickle - str -  file name for dict containing trigger times
             reference_time - int - "burn-in" period (as an index) for the data.  Used to define
                 the reference point in preprocessing.
@@ -175,7 +173,7 @@ class SeriesModel(object):
         self.min_time = min_time
 
         # triggering conditions
-        self.trigger = trigger
+        self.trigger_threshold = trigger_threshold
         self.trigger_pickle = trigger_pickle
         self.trigger_times = defaultdict(dict)
 
@@ -243,7 +241,18 @@ class SeriesModel(object):
 
     ### MAIN METHODS ###
     def __repr__(self):
-        return usm.print_dict_values(self.__dict__)
+        # NOTE: needs debugging as some classes still cause error when trying to
+        # print
+        output = ''
+        keys = self.__dict__.keys()
+        keys.sort()
+        for k in keys:
+            v = self.__dict__[k]
+            if type(v) in [str, int, float, bool]:
+                output += '\n%s: %s' % (k, v)
+            else:
+                output += '\n%s: %s' % (k, type(v))
+        return output
 
     # i) SETUP #
     def setup(self, X, y):
@@ -1177,9 +1186,7 @@ class SeriesModel(object):
 
         X_features, scores = featurizer.fit_transform(X_train)
         # print X_features.head()
-        if self.trigger:
-            # store trigger times
-            pass
+
         # need to flatten the features
         # X_flat = X_features.apply(lambda x: x.flatten())
         X_flat = X_features.apply(lambda x: self.make_flat_features(x))
@@ -1335,17 +1342,45 @@ class SeriesModel(object):
         self.fold_predictions = defaultdict(dict)
         self.fold_predictions_test = defaultdict(dict)
 
-
         self.models = defaultdict(dict)
         self.scalers = defaultdict(dict)
         self.reducers = defaultdict(dict)
 
+        # TSM
+        # shifted time axis for each fold, trial
+        self.tau = defaultdict(None)
+        self.tau_test = defaultdict(None)
+        # trigger time for each fold, trial
+        self.trigger = defaultdict(None)
+        self.triggered = defaultdict(None)
+        self.trigger_test = defaultdict(None)
+        self.triggered_test = defaultdict(None)
+        # detection results for each fold, timestep
+        self.trigger_results = defaultdict(dict)
+        self.trigger_results_test = defaultdict(dict)
         sss = StratifiedShuffleSplit(y=y['classification'],
                 n_iter=self.nfolds,
                 test_size=self.fold_size,
                 random_state=1)
         for i, (train_index, test_index) in enumerate(sss):
             self.folds[i] = {'train': train_index, 'test': test_index}
+
+            # TSM
+            self.trigger_results[i] = pd.DataFrame(columns=['time', 'trigger_times',
+                'trigger_values', 'probabilities', 'tprs', 'fprs', 'thresholds'])
+            # for each fold, trigger time for each trial, be it train or test
+            self.trigger[i] = np.zeros(len(y))
+            self.triggered[i] = np.zeros(len(y))
+            self.tau[i] = defaultdict(None)
+            for trial in range(0, len(y)):
+                self.tau[i][trial] = np.zeros((self.max_time, 1))
+
+            self.trigger_test[i] = np.zeros(len(y))
+            self.triggered_test[i] = np.zeros(len(y))
+            self.tau_test[i] = defaultdict(None)
+            for trial in range(0, len(y)):
+                self.tau_test[i][trial] = np.zeros((self.max_time, 1))
+
             # fold_features[fold][result_type][time] => np_array of features
             self.fold_features[i] = {
                 'detection':defaultdict(dict),
@@ -1614,12 +1649,6 @@ class SeriesModel(object):
 
 
     #### WORKHORSE METHOD ####
-    def _check_trial_integrity(self):
-        if self.max_time > self.trial_lengths.min():
-            ptf( '***FIT ERROR***', self.logfile)
-            ptf( 'Minimum trial_length, %s, is less than max_time, %s' % (self.trial_lengths.min(), self.max_time), self.logfile)
-            return
-
     def fit(self, X, y, verbose=False, debug=False):
         self.verbose = verbose
         self.debug = debug
@@ -1636,7 +1665,10 @@ class SeriesModel(object):
         self.setup(X,y)
 
         # Check trial integrity
-        self._check_trial_integrity()
+        if self.max_time > self.trial_lengths.min():
+            ptf( '***FIT ERROR***', self.logfile)
+            ptf( 'Minimum trial_length, %s, is less than max_time, %s' % (self.trial_lengths.min(), self.max_time), self.logfile)
+            return
 
         # generate all features or load all features
         if self.featurizer_coldstart:

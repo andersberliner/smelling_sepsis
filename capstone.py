@@ -16,6 +16,7 @@ import datetime
 import time
 from seriesmodel import SeriesModel
 from unittests import run_unittests
+from tsm_unittests import run_tsm_unittests
 import multiprocessing
 from output_capstone import print_to_file_and_terminal as ptf
 from utils_capstone import load_data, split_train_test, export_to_r_and_pickle, \
@@ -38,7 +39,7 @@ RUNID = 'run001' # default name if now specified on command line
 MODELFILENAME = 'sm'
 # LOGFILENAME = None
 PICKLE_DATA = True # save loaded data to a pickle for future loading efficiency
-DO_TESTS = False # run unittests instead of the main model
+DO_TESTS = True # run unittests instead of the main model
 PROFILE = False # do memory profiling
 verbose = True # how much output
 debug = True # subset timeseries to just 3 points (T)
@@ -68,6 +69,7 @@ def main(RUNID='run001', START_DT_STR=None, MODELFILENAME='sm', PICKLE_DATA=Fals
 
     ### Unittests ###
     if DO_TESTS:
+
         sm_unit = run_unittests(X_test, y_test, verbose=False)
     else:
         # ouptput run conditions to screen and logfile
@@ -269,7 +271,17 @@ if __name__ == '__main__':
 
     ### Unittests ###
     if DO_TESTS:
-        sm_unit = run_unittests(X_test, y_test, verbose=False)
+        start = time.time()
+        ptf( '\n>> Unpickling data ...\n', LOGFILE)
+        X = my_unpickle(PICKLE_NAMES[0])
+        y = my_unpickle(PICKLE_NAMES[1])
+        used_column_headers = my_unpickle(PICKLE_NAMES[2])
+
+        end = time.time()
+        ptf( 'Data unpickled in %d seconds (%d total trials)' % ((end-start), len(X)), LOGFILE)
+
+        tsm_unit = run_tsm_unittests(X, y, verbose=verbose, logfile=LOGFILE)
+        # sm_unit = run_unittests(X_test, y_test, verbose=False)
     else:
         # ouptput run conditions to screen and logfile
         bigstart = time.time()
