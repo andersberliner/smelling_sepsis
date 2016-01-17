@@ -1338,7 +1338,7 @@ class SeriesModel(object):
         self.fold_probabilities_test = defaultdict(dict)
         self.fold_predictions = defaultdict(dict)
         self.fold_predictions_test = defaultdict(dict)
-        self.
+
 
         self.models = defaultdict(dict)
         self.scalers = defaultdict(dict)
