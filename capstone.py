@@ -280,7 +280,7 @@ if __name__ == '__main__':
         end = time.time()
         ptf( 'Data unpickled in %d seconds (%d total trials)' % ((end-start), len(X)), LOGFILE)
 
-        tsm_unit = run_tsm_unittests(X, y, verbose=verbose, logfile=LOGFILE)
+        tsm_unit = run_tsm_unittests(X, y, used_column_headers, verbose=verbose, logfile=LOGFILE)
         # sm_unit = run_unittests(X_test, y_test, verbose=False)
     else:
         # ouptput run conditions to screen and logfile
@@ -322,6 +322,8 @@ if __name__ == '__main__':
             debug=debug, profile=PROFILE, verbose=verbose, start=False)
 
         print_run_details(X, sm, LOGFILE)
+
+        save_model(sm, RUNID, MODELFILENAME, LOGFILE=LOGFILE)
 
         if PROFILE:
             print_memory_profiles(sm, tr, tr_sm, LOGFILE = None)
