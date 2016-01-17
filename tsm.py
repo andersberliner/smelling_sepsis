@@ -32,6 +32,7 @@ import utils_seriesmodel as usm
 
 class TriggeredSeriesModel(SeriesModel):
     def __init__(self,
+            column_headers,
             # run conditions
             verbose = False,
             logfile = None,
@@ -57,10 +58,10 @@ class TriggeredSeriesModel(SeriesModel):
             detection_featurizer_arguments = {'order':2, 'dx':20.0, 'maxmin':True},
             detection_featurizer = 'derivative',
             # Pickles
-            featurizer_pickle = 'featurizer.pkl'
-            features_pickle = 'features.pkl'
-            fold_features_pickle = 'fold_features.pkl'
-            fold_features_test_pickle = 'fold_features_test.pkl'
+            featurizer_pickle = 'featurizer.pkl',
+            features_pickle = 'features.pkl',
+            fold_features_pickle = 'fold_features.pkl',
+            fold_features_test_pickle = 'fold_features_test.pkl,
             # Deprecated conditions required by parent class
             gram_featurizer = None,
             gram_featurizer_arguments = None,
@@ -90,6 +91,7 @@ class TriggeredSeriesModel(SeriesModel):
         self.color_vector_type = color_vector_type
         self.reference_time = reference_time
         self.number_of_columns = 220 # expected number of spots and colors + time
+        self.column_headers = column_headers
         # subset of spots to consider for gram and classification
         # if None, use all the spots passed-in
         self.classification_spots = classification_spots
@@ -240,6 +242,50 @@ class TriggeredSeriesModel(SeriesModel):
                 self.fold_predictions[i][k] = np.zeros(len(train_index))
                 self.fold_predictions_test[i][k] = np.zeros(len(test_index))
 
+
+        # 0A) PRUNE #
+        def prune_spots(self, X, trigger_spots, column_headers):
+            '''
+            Prunes preprocdessed data to just spots in trigger_spots
+            IN:
+                SeriesModel
+                X - pd dataframe - preprocessed trial data.  see data structures.  Usually passed in to fit
+                trigger_spots - list - list of str names of spots to keep.
+                column_headers - list - list of str names of all columns
+            OUT:
+                X - pd dataframe - preprocessed trial data
+            '''
+            if self.beyond('preprocess'):
+                ptf('\n>> 0. Skipped Preprocessing << \n', self.logfile)
+                return None
+            elif self.load_state == 'preprocess':
+                ptf('\n>> 0. LOADING Preprocessed data ...', self.logfile)
+                X = self.load_time_step('DI')
+                return X
+            start = time.time()
+            ptf('\n>> 0. Preprocessing data ...', self.logfile)
+
+            X = X.copy()
+            reference_time = self.reference_time
+            # change color-scale as required
+            # assume it's RGB
+            if self.color_scale == 'HSV':
+                X = self._rgb_to_hsv(X)
+
+            if self.color_vector_type == 'I':
+                pass
+            elif self.color_vector_type == 'DI':
+                X = X.apply(lambda x: self._calculate_differences(x, reference_time))
+            elif self.color_vector_type == 'DII':
+                X = X.apply(lambda x: self._calculate_normalized_differences(x, reference_time))
+
+
+            end = time.time()
+            ptf('\n>> Prepocessing completed (%s seconds) <<' % (end-start), self.logfile)
+            if self.on_disk:
+                self.pickle_time_step(X, 'DI')
+            return X
+
     # 1) FEATURIZE #
     def featurize_triggers(self, X, featurizer_pickle, fold, t):
         '''
@@ -265,7 +311,8 @@ class TriggeredSeriesModel(SeriesModel):
         if self.debug:
             print t, X.iloc[0].shape
 
-        X_trigger, trigger_times = self._featurize_class(X_train, t)
+        X_trigger, trigger_times = self._featurize_class(X_train,
+            self.trigger_base_model, self.trigger_base_model_arguments)
         if self.debug:
             print t, X_detection.iloc[0].shape, trigger_times.iloc[0].shape
 
