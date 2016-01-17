@@ -337,13 +337,15 @@ class SeriesModel(object):
             return
         start = time.time()
         if self.load_state == 'featurize':
+            ptf('\n>> 0. LOADING Preprocessed data ...', self.logfile)
+            X = self.load_time_step('DI')
             tstart = self.load_time
             ptf('\n>> 1. Featurizing data from timestep %d ...' % self.load_time, self.logfile)
         else:
             tstart = self.times[0]
             ptf('\n>> 1. Featurizing data ...', self.logfile)
 
-        run_times = self.mrt(self.times, tstart)
+        run_times = self.make_run_times(self.times, tstart)
         for t in run_times:
             number_of_times = t
             # featurize, storing featurizers at each timestep
@@ -1426,7 +1428,7 @@ class SeriesModel(object):
     def tsdict(self, Xd, Xg, Xc):
         return {'detection':Xd, 'gram': Xg, 'classification': Xc}
 
-    def mrt(self, times, tstart):
+    def make_run_times(self, times, tstart):
         return [t for t in times if t >= tstart]
 
     def make_fname(self, piece, t=-1, fold=-1):

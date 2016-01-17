@@ -34,6 +34,20 @@ class SpotTimePlot(object):
 
         #plt.tight_layout()
 
+    def __repr__(self):
+        # NOTE: needs debugging as some classes still cause error when trying to
+        # print
+        output = ''
+        keys = self.__dict__.keys()
+        keys.sort()
+        for k in keys:
+            v = self.__dict__[k]
+            if type(v) in [str, int, float, bool]:
+                output += '\n%s: %s' % (k, v)
+            else:
+                output += '\n%s: %s' % (k, type(v))
+        return output
+
     def update_fits(self, val):
         spot = int(self.sspot.val)
         group = int(self.sclass.val)
