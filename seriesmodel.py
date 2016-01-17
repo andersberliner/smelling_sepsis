@@ -35,7 +35,9 @@ class SeriesModel(object):
                     load_time = 0,
                     runid = 'output',
                     color_scale = 'RGB',
-                    color_vector_type = 'DI',
+                    color_vector_type = 'DII',
+                    trigger = False,
+                    trigger_pickle = 'triggers.pickle',
                     reference_time = 0,
                     max_time = 60, # 20 hrs max
                     min_time = 1, # time after ref_time to start fitting
@@ -97,6 +99,9 @@ class SeriesModel(object):
                 'RBG', 'CSV' (not implemented)
             color_vector_type - str - preprocess data as raw 'I', differences 'DI',
                 or percent differences 'DII'
+            trigger - bool - whether to adjust the time-scale once detection
+                threshold is crossed for classification and gram
+            trigger_pickle - str -  file name for dict containing trigger times
             reference_time - int - "burn-in" period (as an index) for the data.  Used to define
                 the reference point in preprocessing.
             max_time - int - featurize up until this time index
@@ -166,6 +171,10 @@ class SeriesModel(object):
         self.reference_time = reference_time
         self.max_time = max_time
         self.min_time = min_time
+
+        # triggering conditions
+        self.trigger = trigger
+        self.trigger_pickle = trigger_pickle
 
         # fit conditions
         self.use_last_timestep_results = use_last_timestep_results
@@ -283,7 +292,7 @@ class SeriesModel(object):
             return None
         elif self.load_state == 'preprocess':
             ptf('\n>> 0. LOADING Preprocessed data ...', self.logfile)
-            X = lts('DI')
+            X = self.load_time_step('DI')
             return X
         start = time.time()
         ptf('\n>> 0. Preprocessing data ...', self.logfile)
@@ -1329,6 +1338,7 @@ class SeriesModel(object):
         self.fold_probabilities_test = defaultdict(dict)
         self.fold_predictions = defaultdict(dict)
         self.fold_predictions_test = defaultdict(dict)
+        self.
 
         self.models = defaultdict(dict)
         self.scalers = defaultdict(dict)
@@ -1616,9 +1626,7 @@ class SeriesModel(object):
         # don't use results for the first model made
         use_last_timestep_results = False
         if debug:
-            ## come back here ##
-            self.times = [15,16]
-            # self.times = [30,40,50]
+            self.times = [30,40,50]
         else:
             self.times = np.arange(t, self.max_time, 1)
 
