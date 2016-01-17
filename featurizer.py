@@ -364,7 +364,7 @@ class DerivativeFeaturizer(object):
         for trial_index, x in enumerate(X):
             if trial_index % 100 == 0:
                 if self.verbose:
-                    ptf( 'Taing derivatives of trial %d'%  trial_index, self.logfile)
+                    ptf( 'Taking derivatives of trial %d'%  trial_index, self.logfile)
             number_of_times = len(x)
             Xp = np.zeros((number_of_times, number_of_spots))
             scores = np.zeros(number_of_spots)

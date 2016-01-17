@@ -17,7 +17,7 @@ from sklearn.decomposition import PCA
 from sklearn.cross_validation import StratifiedShuffleSplit
 from itertools import izip
 from collections import defaultdict
-from featurizer import PolynomialFeaturizer, KineticsFeaturizer
+from featurizer import PolynomialFeaturizer, KineticsFeaturizer, DerivativeFeaturizer
 import multiclassmetrics as mcm
 import time
 from functools import partial
@@ -1156,6 +1156,11 @@ class SeriesModel(object):
             featurizer_arguments['logfile'] = self.logfile
             featurizer_arguments['verbose'] = self.verbose
             featurizer = KineticsFeaturizer(**featurizer_arguments)
+        elif featurizer_type == 'derivative':
+            featurizer_arguments['reference_time'] = self.reference_time
+            featurizer_arguments['logfile'] = self.logfile
+            featurizer_arguments['verbose'] = self.verbose
+            featurizer = DerivativeFeaturizer(**featurizer_arguments)
         elif featurizer_type == 'forecast':
             featurizer_arguments['reference_time'] = self.reference_time
             featurizer_arguments['logfile'] = self.logfile
