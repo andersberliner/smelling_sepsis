@@ -59,7 +59,7 @@ class SeriesModel(object):
                     detection_featurizer_arguments={},
                     gram_model='LR',
                     gram_model_arguments={},
-                    gram_reducer='pca',
+                    gram_reducer='detection',
                     gram_reducer_arguments={},
                     gram_featurizer='detection',
                     gram_featurizer_arguments={},
@@ -67,7 +67,7 @@ class SeriesModel(object):
                     gram_scaler_arguments={},
                     classification_model='LR',
                     classification_model_arguments={},
-                    classification_reducer='pca',
+                    classification_reducer='detection',
                     classification_reducer_arguments={},
                     classification_featurizer='gram',
                     classification_featurizer_arguments={},
@@ -321,7 +321,7 @@ class SeriesModel(object):
                 using runid as filename prefix.
         OUT:
             X - dict of dict of np_arrays - scaled features (ntrials X nfeatures) for each
-                timestep (first key), and class(second key)
+                timestep (second key), and class(first key)
         '''
         if self.beyond('featurize'):
             ptf('\n>> 1. Skipped Featurizing <<\n', self.logfile)
@@ -1171,8 +1171,9 @@ class SeriesModel(object):
         # print X_features.head()
 
         # need to flatten the features
-        X_flat = X_features.apply(lambda x: x.flatten())
-        return X_features, featurizer
+        # X_flat = X_features.apply(lambda x: x.flatten())
+        X_flat = X_features.apply(lambda x: self.make_flat_features(x))
+        return X_flat, featurizer
 
     # 2) SCALE #
     def _scale_class(self, X, scaler_type, scaler_arguments):
@@ -1366,6 +1367,16 @@ class SeriesModel(object):
 
 
     ### UTILITY METHODS ###
+    def make_flat_features(self, xf):
+        # from featurizer, each element of xf is degree of featurizer X nfeatures
+        # this makes flat array of type:
+        #  [Spot 2R - F1, 2R-F2, 2R-F3,..,2R-Fn, 2G-F1,.....,79B-F1,....,79B-Fn]
+        return xf.T.flatten()
+
+    def make_rect_features(self, xff, Nrows, Ncols):
+        # Returns the "old" shape of the features
+        return xff.reshape((Ncols, Nrows)).T
+
     def beyond(self, stage):
         # Determines if given stage is beyond the load_state
         if self.load_state in self.stages:
@@ -1617,10 +1628,25 @@ class SeriesModel(object):
 
         # generate all features or load all features
         if self.featurizer_coldstart:
+            # if self.debug:
+            #     print 'Before preprocess', X.iloc[0][:,:2]
+
             # 0) PREPROCESS All trials
             X_preprocessed = self.preprocess(X)
+
+            # if self.debug:
+            #     print 'After preprocess', X_preprocessed.iloc[0][:,:2]
+
             # 1) FEATURIZE - step by timestep
             X_featurized = self.featurize(X_preprocessed, self.featurizer_pickle)
+
+            # if self.debug:
+            #     if not self.on_disk:
+            #         print 'After featurization', X_featurized['detection'][24][0]
+            #     else:
+            #         print 'After featurization'
+            #         p = self.load_time_step('features', t=24)
+            #         print p['detection'][0]
 
             # 1A) PICKLE FEATURES #
             if self.beyond('featurize'):
@@ -1645,8 +1671,30 @@ class SeriesModel(object):
         if self.scaler_coldstart or self.reducer_coldstart:
             # 2) SCALE - step by timestep and by fold
             X_scaled = self.scale(X_featurized, self.scaler_pickle)
+
+            # if self.debug:
+            #     if not self.on_disk:
+            #         print 'After scaling', X_scaled[0]['detection'][24][0]
+            #         print 'Xf', X_featurized['detection'][24][0]
+            #         print 'X', X.iloc[0][:,:2]
+            #     else:
+            #         print 'After scaling'
+            #         p = self.load_time_step('scaleds', t=24, fold=0)
+            #         print p['detection'][0]
+
             # 3) REDUCE - step by timestep and by fold
             X_reduced = self.reduce(X_scaled, self.reducer_pickle)
+
+            # if self.debug:
+            #     if not self.on_disk:
+            #         print 'After reducing', X_reduced[0]['detection'][24][0]
+            #         print 'Xs', X_scaled[0]['detection'][24][0]
+            #         print 'Xf', X_featurized['detection'][24][0]
+            #         print 'X', X.iloc[0][:,:2]
+            #     else:
+            #         print 'After featurization'
+            #         p = self.load_time_step('reduceds', t=24, fold=0)
+            #         print p['detection'][0]
 
             start = time.time()
             ptf('\n>> 4A. Pickling final features to %s, %s' % (self.fold_features_pickle, self.fold_features_test_pickle), self.logfile)

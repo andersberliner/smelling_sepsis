@@ -12,6 +12,7 @@ import pandas as pd
 from itertools import izip
 import time
 from output_capstone import print_to_file_and_terminal as ptf
+from math_capstone import pade, my_sigmoid, my_sigmoid_prime, my_sigmoid_prime_prime
 
 class PolynomialFeaturizer(object):
     def __init__(self, n=4, reference_time=0,
@@ -64,7 +65,7 @@ class PolynomialFeaturizer(object):
             self.regressor_type = 'LassoCV'
         else:
             model = LinearRegression(fit_intercept=False, n_jobs=self.n_jobs)
-
+            self.regressor_type = 'OLS'
         coef_, scores_ = self._regress(X, model, poly)
         return coef_, scores_
 
@@ -82,9 +83,12 @@ class PolynomialFeaturizer(object):
 
         # clean-up from before
         # Z = self.X.copy()
+        print type(Z), Z.head()
+        print type(coefs), coefs.head()
 
         poly = PolynomialFeatures(degree=self.n)
         for trial_index, (coefficients, x) in enumerate(izip(coefs, Z)):
+            print trial_index, coefficients.shape, x.shape
             # reshape required by t
             t = poly.fit_transform((x[:,0]).reshape(-1,1))
             # only regress on data past reference time
@@ -96,6 +100,7 @@ class PolynomialFeaturizer(object):
             # columns up to reference time are just 0 and were not regressed
             z[:self.reference_time, 1:] = 0
             # columns after reference_time were regressed with coefficients
+            print t.shape, z.shape, coefficients.shape
             z[self.reference_time:, 1:] = np.dot(t, coefficients)
             Z.iloc[trial_index] = z
         return Z
@@ -112,7 +117,7 @@ class PolynomialFeaturizer(object):
         for trial_index, x in enumerate(X):
             if trial_index % 100 == 0:
                 if self.verbose:
-                    ptf( 'Featurizing trial %d'%  trial_index, self.logfile)
+                    ptf( 'Polynomial Featurizing trial %d'%  trial_index, self.logfile)
             # regress coefficients are (poly order +1 )x(n_spots)
             coefficients = np.zeros(((self.n+1), number_of_spots))
             scores = np.zeros(number_of_spots)
@@ -134,11 +139,13 @@ class PolynomialFeaturizer(object):
                     model.fit(t, x[self.reference_time:,column_index])
                     coefficients[:, spot_index] = model.coef_
                     scores[spot_index] = model.score(t, x[self.reference_time:, column_index])
+                    # print trial_index, spot_index, model.coef_, scores[spot_index]
             coef_.iloc[trial_index] = coefficients
             scores_.iloc[trial_index] = scores
 
         end = time.time()
-        ptf( 'Regressed %d trials, n=%d in %d seconds' % (len(X), self.n, (end-start)), self.logfile)
+        # ptf( 'Regressed %d trials, n=%d in %d seconds' % (len(X), self.n, (end-start)), self.logfile)
+        print 'PFR', coef_.iloc[0][:,0], X.iloc[0].shape
         return coef_, scores_
 
 class KineticsFeaturizer(object):
@@ -185,8 +192,9 @@ class KineticsFeaturizer(object):
             Z.iloc[trial_index] = z
         return Z
 
-    def sigmoid(self, t,A,k,C):
-        y = 1./(A + np.exp(-(k*t + C)))
+    def sigmoid(self, t,A,k,B):
+        y = my_sigmoid(t, k=k, A=A, B=B)
+        # y = 1./(A + np.exp(-(k*t + C)))
         return y
 
     def _regress(self, X):
@@ -199,7 +207,7 @@ class KineticsFeaturizer(object):
         for trial_index, x in enumerate(X):
             if trial_index % 100 == 0:
                 if self.verbose:
-                    ptf( 'Featurizing trial %d'%  trial_index, self.logfile)
+                    ptf( 'Kinetics Featurizing trial %d'%  trial_index, self.logfile)
             # regress coefficients are (poly order +1 )x(n_spots)
             coefficients = np.zeros((3, number_of_spots))
             scores = np.zeros(number_of_spots)
@@ -330,6 +338,61 @@ class KinkFeaturizer(object):
         ptf( 'Regressed %d trials in %d seconds' % (len(X), (end-start)), self.logfile)
         return coef_, scores_
 
+class DerivativeFeaturizer(object):
+    def __init__(self, order=1, dx=1.0, reference_time=0, verbose=False, logfile=None):
+        self.order = order
+        self.reference_time = reference_time
+        self.verbose = verbose
+        self.logfile = logfile
+        self.dx = dx
+
+    def fit_transform(self, X):
+        Xp_, scores_ = self._regress(X)
+
+        return Xp_, scores_
+
+    def predict(self, X):
+        pass
+
+    def _regress(self, X):
+        start = time.time()
+        number_of_spots = X.iloc[0].shape[1]-1
+        self.number_of_spots = number_of_spots
+        Xp_ = X.copy()
+        scores_ = X.apply(lambda x: np.zeros(number_of_spots))
+
+        for trial_index, x in enumerate(X):
+            if trial_index % 100 == 0:
+                if self.verbose:
+                    ptf( 'Taing derivatives of trial %d'%  trial_index, self.logfile)
+            number_of_times = len(x)
+            Xp = np.zeros((number_of_times, number_of_spots))
+            scores = np.zeros(number_of_spots)
+            # print x.shape, number_of_times, number_of_spots, Xp.shape, scores.shape
+            for column_index in np.arange(x.shape[1]):
+                spot_index = column_index - 1
+                if column_index == 0:
+                    pass
+                else:
+                    score = 0
+                    fp = x[:, column_index].reshape(-1,1)
+                    # print 'about to derive', fp.shape
+                    for dummy in range(self.order):
+                        # print 'derive loop', fp.shape
+                        fp, s = pade(fp, self.dx)
+                        # print 'after derive', fp.shape, s.shape
+                        # score += s
+                    # print fp.shape, Xp[:, spot_index].shape
+                    # return the trigger time as the other feature instead of a score
+                    scores[spot_index] = x[np.argmax(np.abs(fp)),0]
+                    Xp[:,spot_index] = fp.flatten()
+                    Xp[:self.reference_time, spot_index] = 0
+                    # scores[spot_index] = score
+            Xp_.iloc[trial_index] = Xp
+            scores_.iloc[trial_index] = scores
+        end = time.time()
+        ptf( 'Regressed %d trials in %d seconds' % (len(X), (end-start)), self.logfile)
+        return Xp_, scores_
 
 class LongitudinalFeaturizer(object):
     def __init__(self):
