@@ -61,7 +61,7 @@ class TriggeredSeriesModel(SeriesModel):
             featurizer_pickle = 'featurizer.pkl',
             features_pickle = 'features.pkl',
             fold_features_pickle = 'fold_features.pkl',
-            fold_features_test_pickle = 'fold_features_test.pkl,
+            fold_features_test_pickle = 'fold_features_test.pkl',
             # Deprecated conditions required by parent class
             gram_featurizer = None,
             gram_featurizer_arguments = None,
