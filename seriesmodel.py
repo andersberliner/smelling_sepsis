@@ -243,7 +243,7 @@ class SeriesModel(object):
 
     ### MAIN METHODS ###
     def __repr__(self):
-        return usm.print_dict_values(self.__dict__)
+        return  usm.print_dict_values(self.__dict__, name=str(type(self)))
 
     # i) SETUP #
     def setup(self, X, y):
@@ -308,7 +308,40 @@ class SeriesModel(object):
         if self.on_disk:
             self.pickle_time_step(X, 'DI')
         return X
+    # 0A) PRUNE #
+    def prune_spots(self, X, trigger_spots, column_headers):
+        '''
+        Prunes preprocdessed data to just spots in trigger_spots
+        IN:
+            SeriesModel
+            X - pd dataframe - preprocessed trial data.  see data structures.  Usually passed in to fit
+            trigger_spots - list - list of str names of spots to keep.
+            column_headers - list - list of str names of all columns
+        OUT:
+            X - pd dataframe - pruned trial data
+        '''
 
+        if self.beyond('prune'):
+            ptf('\n>> 0A. Skipped Pruning << \n', self.logfile)
+            return None
+        elif self.load_state == 'prune':
+            ptf('\n>> 0A. LOADING Pruned data ...', self.logfile)
+            X = self.load_time_step('DI')
+            return X
+        start = time.time()
+        ptf('\n>> 0A. Pruning data ...', self.logfile)
+        self.trigger_indexes = np.arange(0, len(column_headers),1)
+        if trigger_spots:
+            # do stuff
+            trigger_indexes = usm.extract_column_indexes(trigger_spots, column_headers)
+            X = usm.pd_slicer(X, trigger_indexes)
+            self.trigger_indexes = trigger_indexes
+
+        end = time.time()
+        ptf('\n>> Pruning completed (%s seconds) <<' % (end-start), self.logfile)
+        if self.on_disk:
+            self.pickle_time_step(X, 'prune')
+        return X
     # 1) FEATURIZE #
     def featurize(self, X, featurizer_pickle):
         '''
@@ -1177,12 +1210,12 @@ class SeriesModel(object):
 
         X_features, scores = featurizer.fit_transform(X_train)
         # print X_features.head()
-        if self.trigger:
-            # store trigger times
-            pass
         # need to flatten the features
         # X_flat = X_features.apply(lambda x: x.flatten())
         X_flat = X_features.apply(lambda x: self.make_flat_features(x))
+        if self.trigger:
+            # store trigger times
+            X_flat = (X_flat, scores)
         return X_flat, featurizer
 
     # 2) SCALE #

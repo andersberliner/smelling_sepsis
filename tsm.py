@@ -34,6 +34,7 @@ class TriggeredSeriesModel(SeriesModel):
     def __init__(self,
             column_headers,
             # run conditions
+            debug = False,
             verbose = False,
             logfile = None,
             on_disk = True, # whether to keep results in memory or write to disk after each timestep
@@ -79,6 +80,8 @@ class TriggeredSeriesModel(SeriesModel):
         self.min_time = min_time
         self.load_state = load_state
         self.load_time = load_time
+        self.verbose = verbose
+        self.debug = debug
         # used by parent class for recylced methods
         self.trigger = True
 
@@ -120,7 +123,7 @@ class TriggeredSeriesModel(SeriesModel):
         self.use_last_timestep_results = use_last_timestep_results
 
         # other
-        self.stages = ['start', 'preprocess', 'featurize']
+        self.stages = ['start', 'preprocess', 'prune', 'featurize']
 
     ### MAIN METHODS ###
     # use base class repr
@@ -173,13 +176,14 @@ class TriggeredSeriesModel(SeriesModel):
         self.tau = defaultdict(None)
         self.tau_test = defaultdict(None)
         # trigger time for each fold, trial
-        self.trigger = defaultdict(None)
+        self.trigger_times = defaultdict(None)
         self.triggered = defaultdict(None)
         self.trigger_test = defaultdict(None)
         self.triggered_test = defaultdict(None)
         # trigger features for each time
         self.trigger_features = defaultdict(None)
-        self.trigger_times = defaultdict(None)
+        self.trigger_feature_times = defaultdict(None)
+        self.trigger_featurizers = defaultdict(None)
         # detection results for each fold, timestep
         self.trigger_results = defaultdict(dict)
         self.trigger_results_test = defaultdict(dict)
@@ -197,7 +201,7 @@ class TriggeredSeriesModel(SeriesModel):
             self.trigger_results[i] = pd.DataFrame(columns=['time', 'trigger_times',
                 'trigger_values', 'probabilities', 'tprs', 'fprs', 'thresholds'])
             # for each fold, trigger time for each trial, be it train or test
-            self.trigger[i] = np.zeros(len(y))
+            self.trigger_times[i] = np.zeros(len(y))
             self.triggered[i] = np.zeros(len(y))
             self.tau[i] = defaultdict(None)
             for trial in range(0, len(y)):
@@ -243,63 +247,19 @@ class TriggeredSeriesModel(SeriesModel):
                 self.fold_predictions_test[i][k] = np.zeros(len(test_index))
 
 
-        # 0A) PRUNE #
-        def prune_spots(self, X, trigger_spots, column_headers):
-            '''
-            Prunes preprocdessed data to just spots in trigger_spots
-            IN:
-                SeriesModel
-                X - pd dataframe - preprocessed trial data.  see data structures.  Usually passed in to fit
-                trigger_spots - list - list of str names of spots to keep.
-                column_headers - list - list of str names of all columns
-            OUT:
-                X - pd dataframe - preprocessed trial data
-            '''
-            if self.beyond('preprocess'):
-                ptf('\n>> 0. Skipped Preprocessing << \n', self.logfile)
-                return None
-            elif self.load_state == 'preprocess':
-                ptf('\n>> 0. LOADING Preprocessed data ...', self.logfile)
-                X = self.load_time_step('DI')
-                return X
-            start = time.time()
-            ptf('\n>> 0. Preprocessing data ...', self.logfile)
 
-            X = X.copy()
-            reference_time = self.reference_time
-            # change color-scale as required
-            # assume it's RGB
-            if self.color_scale == 'HSV':
-                X = self._rgb_to_hsv(X)
-
-            if self.color_vector_type == 'I':
-                pass
-            elif self.color_vector_type == 'DI':
-                X = X.apply(lambda x: self._calculate_differences(x, reference_time))
-            elif self.color_vector_type == 'DII':
-                X = X.apply(lambda x: self._calculate_normalized_differences(x, reference_time))
-
-
-            end = time.time()
-            ptf('\n>> Prepocessing completed (%s seconds) <<' % (end-start), self.logfile)
-            if self.on_disk:
-                self.pickle_time_step(X, 'DI')
-            return X
 
     # 1) FEATURIZE #
-    def featurize_triggers(self, X, featurizer_pickle, fold, t):
+    def featurize_triggers(self, X, t):
         '''
-        Extracts features for detection, gram, classification from preprocessed
+        Extracts features for detection, gram, classification from pruneed
         data using conditions passed to init.
         IN:
             SeriesModel
             X - pd dataframe - preprocessed trial data
-            featurizer_pickle - str - file name to store featurizers
-                NOTE: if on_disk = True, pickles are stored at each timestep
-                using runid as filename prefix.
+            t - int - time index
         OUT:
-            X - dict of dict of np_arrays - scaled features (ntrials X nfeatures) for each
-                timestep (second key), and class(first key)
+            X - np_array - extracted features (ntrials X nfeatures) as this timestep
         '''
         start = time.time()
         number_of_times = t
@@ -311,10 +271,10 @@ class TriggeredSeriesModel(SeriesModel):
         if self.debug:
             print t, X.iloc[0].shape
 
-        X_trigger, trigger_times = self._featurize_class(X_train,
-            self.trigger_base_model, self.trigger_base_model_arguments)
+        (X_trigger, trigger_times), trigger_featurizer = self._featurize_class(X_train,
+            self.detection_base_featurizer, self.detection_base_featurizer_arguments)
         if self.debug:
-            print t, X_detection.iloc[0].shape, trigger_times.iloc[0].shape
+            print t, X_trigger.iloc[0].shape, trigger_times.iloc[0].shape
 
         # convert to numpy arrays
         np_X_trigger = self._pandas_to_numpy(X_trigger)
@@ -325,26 +285,18 @@ class TriggeredSeriesModel(SeriesModel):
         # store features
         if not self.on_disk:
             self.trigger_features[t] = np_X_trigger
-            self.trigger_times[t] = np_trigger_times
+            self.trigger_feature_times[t] = np_trigger_times
+            self.trigger_featurizers[t] = trigger_featurizer
         else:
             self.pickle_time_step(np_X_trigger, 'trigger_features', t)
-            self.pickle_time_step(np_X_trigger, 'trigger_times', t)
+            self.pickle_time_step(np_trigger_times, 'trigger_feature_times', t)
+            self.pickle_time_step(trigger_featurizer, 'trigger_featurizer', t)
 
+        # Append results to results df later after scoring
         end = time.time()
         ptf('\n...(%s seconds) <' % (end-start), self.logfile)
 
-        # pickle featurizers
-        if not self.on_disk:
-            featurizer_file_name = featurizer_pickle
-            start = time.time()
-            ptf('\n>> Pickling featurizers to %s ...' % featurizer_file_name, self.logfile)
-
-            self.pickle_time_step(self.featurizers, 'featurizer', file_name = featurizer_file_name)
-
-            end = time.time()
-            ptf('\n>> Pickling completed (%s seconds) <<' % (end-start), self.logfile)
-
-        return self.features
+        return np_X_trigger
 
     ### WORKHORSE methods ###
     # A) FIT
@@ -368,6 +320,7 @@ class TriggeredSeriesModel(SeriesModel):
 
         # 0) PREPROCESS All trials
         X_preprocessed = self.preprocess(X)
+        X_pruned = self.prune_spots(X_preprocessed, self.trigger_spots, self.column_headers)
 
         # check load state and run only needed times
         if self.load_state == 'featurize':
@@ -382,8 +335,8 @@ class TriggeredSeriesModel(SeriesModel):
             if self.verbose:
                 ptf('\n\nTIMESTEP %d...' %t, self.logfile)
             # 1) trigger_featurize
-            X_featurized = self.featurize_triggers(X_preprocessed, self.featurizer_pickle)
-
+            X_featurized = self.featurize_triggers(X_pruned, t)
+            self.featurizer_pickle = []
             # 2) trigger_train
 
             # 3) trigger_predict
