@@ -23,7 +23,7 @@
   "detection_scaler_arguments" : {},
   "detection_reducer" : "pca",
   "detection_reducer_arguments" : {"n_components": 10},
-  "detection_featurizer" : "poly",
+  "detection_featurizer" : "sigmoid",
   "detection_featurizer_arguments" : {"n":4, "n_jobs": 4, "gridsearch": false},
   "gram_model" : "LR",
   "gram_model_arguments" : {"n_jobs":4, "multi_class":"ovr", "verbose":0},
