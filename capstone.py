@@ -10,34 +10,22 @@ Most model parameters should be set in your json (e.g. run001.json).
 Go to ### RUN CONDITIONS ### for things you might tweak for restarting a job, etc.
 '''
 
-import pandas as pd
-import numpy as np
-from matplotlib import pyplot as plt
-import seaborn as sns
-import ntpath
 import os
 import re
 import datetime
-from sklearn.cross_validation import train_test_split, StratifiedShuffleSplit
 import time
-# import rpy2 # note - it is hard to get this module installed on amazone instances
 from seriesmodel import SeriesModel
-from featurizer import PolynomialFeaturizer
-from timeseriesplotter import SpotTimePlot
-from collections import defaultdict
 from unittests import run_unittests
 import multiprocessing
 from output_capstone import print_to_file_and_terminal as ptf
 from utils_capstone import load_data, split_train_test, export_to_r_and_pickle, \
         my_pickle, my_unpickle
 from capstone_r_tools import make_long_dataframe
-from sklearn.linear_model import LogisticRegression
 import pickle
 from itertools import izip
 import json
 import shutil
 from sys import argv
-
 # use pympler to do memory diagnosis
 from pympler import asizeof, tracker, classtracker
 

@@ -1,0 +1,6 @@
+20_series
+ss_conda05
+
+Try DII with polynomial featurizers, un-triggered
+
+20: logistic regression, ss, pca
