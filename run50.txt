@@ -1,0 +1,5 @@
+50_series
+ss_conda03
+
+Try DII with NoneTypes
+40: logistic regression, no scaling, no pca
