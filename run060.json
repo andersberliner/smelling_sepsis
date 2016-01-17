@@ -1,5 +1,5 @@
 {
-  "on_disk" : true,
+  "on_disk" : false,
   "load_state" :  "start",
   "load_time" :  0,
   "color_scale" :  "RGB",
