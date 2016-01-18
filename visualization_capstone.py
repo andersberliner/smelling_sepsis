@@ -69,7 +69,7 @@ def make_trigger_plots(sm, runid, debug=False):
 
         roc_plot(ax2, sm, 'all', t, 'test')
         ax2.legend(loc=4, fontsize=10)
-        plt.savefig('%s - ROC - Test - %d.png' % (runid, t))
+        plt.savefig(runid + '/' + runid + ' - ROC - Test - %d.png' % t)
 
         if debug:
             plt.show()
