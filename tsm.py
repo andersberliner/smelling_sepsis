@@ -569,7 +569,7 @@ class TriggeredSeriesModel(SeriesModel):
                 print np.sum(y[0]==1), np.sum(ysmote == 1)
 
             if self.on_disk:
-                self.pickle_time_step(ysmote_df, 'trigger_resample_labels', fold=fold, t=t)
+                self.pickle_time_step(ysmote_tuple, 'trigger_resample_labels', fold=fold, t=t)
                 self.pickle_time_step(Xsmote, 'trigger_resample_features', fold=fold, t=t)
             else:
                 self.trigger_resample_labels[fold][t] = ysmote_tuple
