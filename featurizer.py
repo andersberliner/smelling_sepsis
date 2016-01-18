@@ -14,6 +14,7 @@ import time
 from output_capstone import print_to_file_and_terminal as ptf
 from math_capstone import pade, my_sigmoid, my_sigmoid_prime, my_sigmoid_prime_prime
 from utils_seriesmodel import print_dict_values
+from scipy.ndimage.filters import gaussian_filter1d
 
 class PolynomialFeaturizer(object):
     def __init__(self, n=4, reference_time=0,
@@ -348,13 +349,17 @@ class KinkFeaturizer(object):
         return coef_, scores_
 
 class DerivativeFeaturizer(object):
-    def __init__(self, order=1, dx=1.0, reference_time=0, maxmin=False, verbose=False, logfile=None):
+    def __init__(self, order=1, dx=1.0, reference_time=0, maxmin=False, verbose=False,
+        logfile=None, stacked=False, gauss=False, sigma=1.0):
         self.order = order
         self.reference_time = reference_time
         self.verbose = verbose
         self.logfile = logfile
         self.dx = dx
         self.maxmin = maxmin # if the max or min deriv should be returned as the feature
+        self.stacked = stacked # if up to that order of derivative should be used
+        self.gauss = gauss
+        self.sigma = sigma
 
     def __repr__(self):
         return  print_dict_values(self.__dict__, name=str(type(self)))
@@ -381,9 +386,14 @@ class DerivativeFeaturizer(object):
             number_of_times = len(x)
             if self.maxmin:
                 Xp = np.zeros((1, number_of_spots))
+                if self.stacked:
+                    Xp = np.zeros((2, number_of_spots))
             else:
                 Xp = np.zeros((number_of_times, number_of_spots))
             trigger_times = np.zeros(number_of_spots)
+
+            if self.stacked:
+                trigger_times = np.zeros((2, number_of_spots))
 
 
             # print x.shape, number_of_times, number_of_spots, Xp.shape, scores.shape
@@ -394,20 +404,45 @@ class DerivativeFeaturizer(object):
                 else:
                     score = 0
                     fp = x[:, column_index].reshape(-1,1)
-                    # print 'about to derive', fp.shape
-                    for dummy in range(self.order):
-                        # print 'derive loop', fp.shape
+                    # want the first AND second derivative
+                    if self.stacked:
+                        if self.order > 2:
+                            print 'ERR - Not implemented for order >2'
+                            return
+                        if not self.maxmin:
+                            print 'ERR - only works with maxmin'
+                            return
                         fp, s = pade(fp, self.dx)
-                        # print 'after derive', fp.shape, s.shape
-                        # score += s
-                    # print fp.shape, Xp[:, spot_index].shape
-                    # return the trigger time as the other feature instead of a score
-                    trigger_times[spot_index] = x[np.argmax(np.abs(fp)),0]
-                    if self.maxmin:
+                        if self.gauss:
+                            fp = gaussian_filter1d(fp, self.sigma)
+                        fpp, s2 = pade(fp, self.dx)
+                        if self.gauss:
+                            fpp = gaussian_filter1d(fpp, self.sigma)
                         Xp[0, spot_index] = np.max(np.abs(fp))
+                        Xp[1, spot_index] = np.max(np.abs(fpp))
+
+                        trigger_times[0, spot_index] = x[np.argmax(np.abs(fp)), 0]
+                        trigger_times[1, spot_index] = x[np.argmax(np.abs(fpp)), 0]
+
                     else:
-                        Xp[:,spot_index] = fp.flatten()
-                        Xp[:self.reference_time, spot_index] = 0
+                        # print 'about to derive', fp.shape
+                        for dummy in range(self.order):
+                            # print 'derive loop', fp.shape
+                            fp, s = pade(fp, self.dx)
+                            if self.gauss:
+                                fp = fp.T
+                                fp = gaussian_filter1d(fp, self.sigma)
+                                fp = fp.T
+                            # print 'after derive', fp.shape, s.shape
+                            # score += s
+                        # print fp.shape, Xp[:, spot_index].shape
+                        # return the trigger time as the other feature instead of a score
+                        trigger_times[spot_index] = x[np.argmax(np.abs(fp)),0]
+                        if self.maxmin:
+                            Xp[0, spot_index] = np.max(np.abs(fp))
+                        else:
+                            Xp[:,spot_index] = fp.flatten()
+                            Xp[:self.reference_time, spot_index] = 0
                     # scores[spot_index] = score
             Xp_.iloc[trial_index] = Xp
             scores_.iloc[trial_index] = trigger_times

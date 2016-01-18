@@ -15,8 +15,10 @@ import re
 import datetime
 import time
 from seriesmodel import SeriesModel
+from tsm import TriggeredSeriesModel
 from unittests import run_unittests
 from tsm_unittests import run_tsm_unittests
+from visualization_capstone import make_series_plots, make_trigger_plots
 import multiprocessing
 from output_capstone import print_to_file_and_terminal as ptf
 from utils_capstone import load_data, split_train_test, export_to_r_and_pickle, \
@@ -33,13 +35,13 @@ from pympler import asizeof, tracker, classtracker
 START_DT = datetime.datetime.now()
 START_DT_STR = START_DT.strftime('%Y-%m-%d_%H-%M-%S')
 PICKLE_NAMES = ['Xdf.pkl', 'ydf.pkl', 'used_column_headers.pkl']
-RUNID = 'run001' # default name if now specified on command line
-
+RUNID = 'run200' # default name if now specified on command line
+RUNTYPE = 'trigger'
 ### RUN CONDITIONS ###
 MODELFILENAME = 'sm'
 # LOGFILENAME = None
 PICKLE_DATA = True # save loaded data to a pickle for future loading efficiency
-DO_TESTS = True # run unittests instead of the main model
+DO_TESTS = False # run unittests instead of the main model
 PROFILE = False # do memory profiling
 verbose = True # how much output
 debug = True # subset timeseries to just 3 points (T)
@@ -52,70 +54,8 @@ def main(RUNID='run001', START_DT_STR=None, MODELFILENAME='sm', PICKLE_DATA=Fals
     DO_TESTS=False, PROFILE=False, verbose=False, debug=False,
     RELOAD=False, n_cpus=1,
     PICKLE_NAMES=['Xdf.pkl', 'ydf.pkl', 'used_column_headers.pkl']):
-    # runs our job
-    RUNID = command_line_process(RUNID)
-    # prepare to run job
-    LOGFILENAME = 'log_%s_%s.txt' % (RUNID, START_DT_STR)
-    LOGFILE = create_logfile(RUNID, LOGFILENAME)
-
-    # get the run conditions for the runid from the json
-    # NOTE excludes verbose and debug flags - those are fit parameters
-    # and exludes runid since that is set up above
-    with open((RUNID + '.json')) as f:
-        run_params = json.load(f, object_hook=ascii_encode_dict)
-
-    # to see if more ram is used for more cpus
-    n_jobs = run_params['detection_model_arguments']['n_jobs']
-
-    ### Unittests ###
-    if DO_TESTS:
-
-        sm_unit = run_unittests(X_test, y_test, verbose=False)
-    else:
-        # ouptput run conditions to screen and logfile
-        bigstart = time.time()
-
-        # start memory profiling
-        if PROFILE:
-            tr, tr_sm = start_memory_profiling
-
-        print_job_info(run_params, n_jobs, n_cpus, RUNID, START_DT_STR, LOGFILE=LOGFILE,
-            debug=debug, profile=PROFILE, verbose=verbose, start=True)
-
-        if RELOAD:
-            X, y, used_column_headers, df, df_raw = reload_data(LOGFILE, PICKLE_DATA)
-        else:
-            start = time.time()
-            ptf( '\n>> Unpickling data ...\n', LOGFILE)
-            X = my_unpickle(PICKLE_NAMES[0])
-            y = my_unpickle(PICKLE_NAMES[1])
-            used_column_headers = my_unpickle(PICKLE_NAMES[2])
-
-            end = time.time()
-            ptf( 'Data unpickled in %d seconds (%d total trials)' % ((end-start), len(X)), LOGFILE)
-
-        run_params['logfile'] = LOGFILE
-        run_params['runid'] = RUNID
-
-        # create model
-        sm = SeriesModel(**run_params)
-
-        # Altogether now
-        print ('** DOING THE FIT **')
-        sm.fit(X, y, verbose=verbose, debug=debug)
-
-        bigend = time.time()
-
-        ptf('====> %d seconds (%0.1f mins)' % ((bigend-bigstart), (bigend-bigstart)/60.0), LOGFILE)
-        print_job_info(run_params, n_jobs, n_cpus, RUNID, START_DT_STR, LOGFILE=LOGFILE,
-            debug=debug, profile=PROFILE, verbose=verbose, start=False)
-
-        print_run_details(X, sm, LOGFILE)
-
-        if PROFILE:
-            print_memory_profiles(sm, tr, tr_sm, LOGFILE = None)
-
-    LOGFILE.close()
+    # paste stuff in later
+    pass
 
 
 def ascii_encode_dict(d):
@@ -290,6 +230,13 @@ if __name__ == '__main__':
         if PROFILE:
             tr, tr_sm = start_memory_profiling
 
+
+        if RUNTYPE == 'trigger':
+            ptf('*** %s - TRIGGERED SERIES MODEL - ***' % RUNID)
+        elif RUNTYPE == 'series':
+            ptf('*** %s - SERIES MODEL - ***' % RUNID)
+
+
         print_job_info(run_params, n_jobs, n_cpus, RUNID, START_DT_STR, LOGFILE=LOGFILE,
             debug=debug, profile=PROFILE, verbose=verbose, start=True)
 
@@ -309,7 +256,10 @@ if __name__ == '__main__':
         run_params['runid'] = RUNID
 
         # create model
-        sm = SeriesModel(**run_params)
+        if RUNTYPE == 'trigger':
+            sm = TriggeredSeriesModel(used_column_headers.values, **run_params)
+        elif RUNTYPE == 'series':
+            sm = SeriesModel(**run_params)
 
         # Altogether now
         print ('** DOING THE FIT **')
@@ -324,6 +274,12 @@ if __name__ == '__main__':
         print_run_details(X, sm, LOGFILE)
 
         save_model(sm, RUNID, MODELFILENAME, LOGFILE=LOGFILE)
+
+        ## VIEW RESULTS
+        if RUNTYPE == 'trigger':
+            make_trigger_plots(sm, RUNID, debug=debug)
+        elif RUNTYPE == 'series':
+            make_series_plots(sm)
 
         if PROFILE:
             print_memory_profiles(sm, tr, tr_sm, LOGFILE = None)
