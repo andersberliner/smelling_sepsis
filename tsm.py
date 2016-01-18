@@ -279,7 +279,7 @@ class TriggeredSeriesModel(SeriesModel):
                 test_size=self.fold_size,
                 random_state=1)
 
-        print sss.n_iter, self.nfolds, len(sss)
+        # print sss.n_iter, self.nfolds, len(sss)
 
         for i, (train_index, test_index) in enumerate(sss):
             print i, len(test_index), len(train_index)

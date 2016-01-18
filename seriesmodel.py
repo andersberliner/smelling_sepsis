@@ -1266,7 +1266,6 @@ class SeriesModel(object):
             # note - need error handling since no predict_proba
             model = LinearSVC(**model_arguments)
         elif model_type == 'SGD':
-            # note - need error handling since no predict_proba
             model = SGDClassifier(**model_arguments)
         elif model_type == 'longitudinal':
             pass
