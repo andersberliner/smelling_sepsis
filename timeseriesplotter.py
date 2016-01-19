@@ -258,6 +258,6 @@ class SpotTimePlot(object):
                         else:
                             plt.plot(t, data, color=self.colors[i], alpha=0.3)
 
-        plt.title(('S:%s, averages:%s, labeltype:%s' % (self.get_column_name(spot),self.averages), grouptype))
+        plt.title(('S:%s, averages:%s, labeltype:%s' % (self.get_column_name(spot),self.averages, grouptype)))
         # plt.ylim([-200,200])
         plt.legend(loc=0, fontsize=6)

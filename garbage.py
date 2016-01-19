@@ -1,3 +1,51 @@
+### from capstone ####
+
+    if False:
+        start = time.time()
+        sm.fit(X_train,y_train, verbose=verbose, debug=debug)
+
+        end = time.time()
+
+        ptf( '\n\n>> Model fit (%d times, %d samples) in %d seconds (%d mins) <<\n\n' % (len(sm.times), len(y_train), (end-start), (end-start)/60.0), LOGFILE)
+
+        # Pickle model
+        train_file_name = 'sm_train_%s.pkl' % START_DT_STR
+
+        train_file = open(train_file_name, 'wb')
+        ptf('\n>> Writing train results to %s' % train_file_name, LOGFILE)
+        pickle.dump(sm, train_file, -1)
+        train_file.close()
+
+        # predict
+        start = time.time()
+        yd, yg, yc = sm.predict(X_test, verbose=verbose)
+        end = time.time()
+        ptf( '\n\n>> Model predictions (%d times, %d samples) in %d seconds (%d mins) <<\n\n' % (len(sm.times), len(y_test), (end-start), (end-start)/60.0), LOGFILE)
+
+        start = time.time()
+        results = sm.score(y_test, verbose=verbose)
+        end = time.time()
+        ptf( '\n\n>> Model scores (%d times, %d samples) in %d seconds (%d mins) <<\n\n' % (len(sm.times), len(y_test), (end-start), (end-start)/60.0), LOGFILE)
+
+        # Pickle model results
+        test_file_name = 'sm_test_%s.pkl' % START_DT_STR
+        test_file = open(test_file_name, 'wb')
+        ptf('\n>> Writing test results to %s' % test_file_name, LOGFILE)
+        pickle.dump(sm, test_file, -1)
+        test_file.close()
+
+    if False:
+        sm.setup(X,y)
+        Z = sm.preprocess(X)
+        Z = sm._subset_data(Z, 60)
+        myfile = open('DI.pkl', 'wb')
+        pickle.dump(Z, myfile, -1)
+        myfile.close()
+
+        print stuff
+
+
+
     sm = SeriesModel(
         # features_pickle = 'features_%s.pkl' % START_DT_STR,
         # fold_features_pickle = 'fold_features_%s.pkl' % START_DT_STR,
@@ -37,8 +85,51 @@
         fold_size=fold_size
         )
 
+### from memory profiling
+    # tr_pf = classtracker.ClassTracker()
+    # tr_stp = classtracker.ClassTracker()
+    # tr_lr = classtracker.ClassTracker()
 
+    # tr_pf.track_class(PolynomialFeaturizer)
+    # tr_stp.track_class(SpotTimePlot)
+    # tr_lr.track_class(LogisticRegression)
 
+    # tr_pf.create_snapshot()
+    # tr_stp.create_snapshot()
+    # tr_lr.create_snapshot()
+
+    # print '\nPOLYNOMIALFEATURIZER profiling'
+    # print 'Size of PF object'
+    # print asizeof.asizeof(sm.featurizers['gram'][50])
+    # print asizeof.asized(sm.featurizers['gram'][50], detail=1).format()
+    # print 'Look at how the PolynomialFeaturizer class is doing'
+    # tr_pf.create_snapshot()
+    # tr_pf.stats.print_summary()
+    #
+    # print '\nSPOTTIMEPLOT profiling'
+    # print 'Size of a STP object'
+    # DI = sm.preprocess(X_test)
+    # PF = PolynomialFeaturizer(n=4, reference_time=2, verbose=True)
+    # mycoefs, myscores = PF.fit_transform(DI)
+    # # myscores = PF.score()
+    # DI_pred = PF.predict(DI, mycoefs)
+    # STP = SpotTimePlot(y_test, used_column_headers)
+    # STP.plot_fits(DI, DI_pred)
+    # print asizeof.asizeof(STP)
+    # print asizeof.asized(STP, detail=1).format()
+    #
+    # print 'Look at how stp is doing'
+    # tr_stp.create_snapshot()
+    # tr_stp.stats.print_summary()
+    #
+    # print '\nLR profiling'
+    # print 'Sizer of an LR object'
+    # print asizeof.asizeof(sm.models['classification'][50])
+    # print asizeof.asized(sm.models['classification'][50], detail=1).format()
+    #
+    # print 'Look at how LR is doing'
+    # tr_lr.create_snapshot()
+    # tr_lr.stats.print_summary()
 # score and write to scores
 self._score_one_timestep(y, y_predict_detection,
                          y_predict_gram, y_predict_classification,
@@ -391,3 +482,17 @@ def _predict_featurize_class(self, X, featurizer):
             ptf('\tfold_features_pickle' % sm.fold_features_pickle, LOGFILE)
 
             model_file_name = 'sm_model_%s.pkl' % START_DT_STR
+
+
+    def make_fname(self, piece, t=-1, fold=-1):
+        if not os.path.exists('./' + self.runid):
+            os.makedirs('./' + self.runid)
+        fname = './' + self.runid + '/' + piece
+        if t>-1:
+            fname = './' + self.runid + '/' + piece + '_t_' + str(t)
+            if fold:
+                fname = './' + self.runid + '/' + piece + '_f_' + str(fold) + '_t_' + str(t)
+        elif fold>-1:
+            fname = './' + self.runid + '/' + piece + '_f_' + str(fold)
+        fname = fname + '.pkl'
+        return fname

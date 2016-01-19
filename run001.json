@@ -17,7 +17,7 @@
   "reducer_coldstart" :  true,
   "scaler_pickle" :  "scaler.pkl",
   "scaler_coldstart" :  true,
-  "detection_model" : "LR",
+  "detection_model" : "LRCV",
   "detection_model_arguments" : {"n_jobs":4, "verbose":0},
   "detection_scaler" : "SS",
   "detection_scaler_arguments" : {},

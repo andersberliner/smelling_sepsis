@@ -277,7 +277,7 @@ if __name__ == '__main__':
 
         ## VIEW RESULTS
         if RUNTYPE == 'trigger':
-            make_trigger_plots(sm, RUNID, debug=debug)
+            make_trigger_plots(sm, y, RUNID, debug=debug)
         elif RUNTYPE == 'series':
             make_series_plots(sm)
 
