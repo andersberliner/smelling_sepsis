@@ -86,44 +86,44 @@ def make_trigger_plots(sm, y, runid, debug=False, logfile=None):
     y['trial'] = y.index
 
 
-    # roc plots
-    for t in sm.times:
-        ptf('ROC plots t=%d' % t)
-
-        fig1, ax1 = plt.subplots()
-        roc_plot_setup(ax1, t, runid, 'train')
-
-        fig2, ax2 = plt.subplots()
-        roc_plot_setup(ax2, t, runid, 'test')
-
-        for i in sm.folds.keys():
-            roc_plot(ax1, sm, i, t, 'train')
-            roc_plot(ax2, sm, i, t, 'test')
-
-        roc_plot(ax1, sm, 'all', t, 'train')
-        ax1.legend(loc=4, fontsize=10)
-        plt.savefig('%s - ROC - Train - %d.png' % (runid, t), dpi=200)
-        if False:
-            plt.show()
-        else:
-            plt.close()
-
-        roc_plot(ax2, sm, 'all', t, 'test')
-        ax2.legend(loc=4, fontsize=10)
-        plt.savefig(runid + '/' + runid + ' - ROC - Test - %d.png' % t, dpi=200)
-
-        if False:
-            plt.show()
-        else:
-            # wipe the plot cache to not use up extra memory
-            plt.close()
-
-    # metrics versus time plots
-    ptf('Metrics vs time plots', logfile)
-    alldf_test = sm.trigger_scores_test[sm.trigger_scores_test['fold'] == 'all']
-    alldf_train = sm.trigger_scores[sm.trigger_scores['fold'] == 'all']
-    metric_vs_time(alldf_train, runid, 'Train', debug=debug)
-    metric_vs_time(alldf_test, runid, 'Test', debug=debug)
+    # # roc plots
+    # for t in sm.times:
+    #     ptf('ROC plots t=%d' % t)
+    #
+    #     fig1, ax1 = plt.subplots()
+    #     roc_plot_setup(ax1, t, runid, 'train')
+    #
+    #     fig2, ax2 = plt.subplots()
+    #     roc_plot_setup(ax2, t, runid, 'test')
+    #
+    #     for i in sm.folds.keys():
+    #         roc_plot(ax1, sm, i, t, 'train')
+    #         roc_plot(ax2, sm, i, t, 'test')
+    #
+    #     roc_plot(ax1, sm, 'all', t, 'train')
+    #     ax1.legend(loc=4, fontsize=10)
+    #     plt.savefig('%s - ROC - Train - %d.png' % (runid, t), dpi=200)
+    #     if False:
+    #         plt.show()
+    #     else:
+    #         plt.close()
+    #
+    #     roc_plot(ax2, sm, 'all', t, 'test')
+    #     ax2.legend(loc=4, fontsize=10)
+    #     plt.savefig(runid + '/' + runid + ' - ROC - Test - %d.png' % t, dpi=200)
+    #
+    #     if False:
+    #         plt.show()
+    #     else:
+    #         # wipe the plot cache to not use up extra memory
+    #         plt.close()
+    #
+    # # metrics versus time plots
+    # ptf('Metrics vs time plots', logfile)
+    # alldf_test = sm.trigger_scores_test[sm.trigger_scores_test['fold'] == 'all']
+    # alldf_train = sm.trigger_scores[sm.trigger_scores['fold'] == 'all']
+    # metric_vs_time(alldf_train, runid, 'Train', debug=debug)
+    # metric_vs_time(alldf_test, runid, 'Test', debug=debug)
 
     # tmax vs t kde plots
     # tmax vs time in df_argmax
@@ -137,24 +137,24 @@ def make_trigger_plots(sm, y, runid, debug=False, logfile=None):
     ch = make_ch(sm)
     for spot in ch:
         if spot[-1] == '1': # only look at first derivative
-            # All together
-            make_kde_plot(df_max, spot, runid,
-                title='max yp', cmap='Greens', plotclass='All',
-                logfile=logfile, debug=debug)
-
-            make_kde_plot(df_argmax, spot, runid,
-                title='tmax yp', cmap='Greens', plotclass='All',
-                logfile=logfile, debug=debug)
-
-            # detection specifying colors
-            df = df_max[df_max['detection'] == 1]
-            make_kde_plot(df, spot, runid,
-                title='max yp', cmap='Reds', plotclass='D=1',
-                logfile=logfile, debug=debug)
+            # # All together
+            # make_kde_plot(df_max, spot, runid,
+            #     title='max yp', cmap='Greens', plotclass='All',
+            #     logfile=logfile, debug=debug)
+            #
+            # make_kde_plot(df_argmax, spot, runid,
+            #     title='tmax yp', cmap='Greens', plotclass='All',
+            #     logfile=logfile, debug=debug)
+            #
+            # # detection specifying colors
+            # df = df_max[df_max['detection'] == 1]
+            # make_kde_plot(df, spot, runid,
+            #     title='max yp', cmap='Reds', plotclass='D=1',
+            #     logfile=logfile, debug=debug)
 
             df = df_argmax[df_argmax['detection'] == 1]
             make_kde_plot(df, spot, runid,
-                title='tmax yp', cmap='Greens', plotclass='D=1',
+                title='tmax yp', cmap='Reds', plotclass='D=1',
                 logfile=logfile, debug=debug)
 
             # detection controls
@@ -174,7 +174,7 @@ def make_trigger_plots(sm, y, runid, debug=False, logfile=None):
                 title='tmax yp', cmap='Purples', plotclass='P',
                 logfile=logfile, debug=debug)
 
-            df = df_argmax[df_argmax['gram'] == 'p']
+            df = df_argmax[df_argmax['gram'] == 'n']
             make_kde_plot(df, spot, runid,
                 title='tmax yp', cmap='Oranges', plotclass='N',
                 logfile=logfile, debug=debug)

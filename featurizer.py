@@ -82,12 +82,12 @@ class PolynomialFeaturizer(object):
 
     # need to change this to accept the input array
     # DONE
-    def predict(self, Z, coefs):
+    def predict(self, X, coefs):
         # first column of Z is time
         # we will replace the other columns with regressed data
 
         # clean-up from before
-        # Z = self.X.copy()
+        Z = self.X.copy()
         print type(Z), Z.head()
         print type(coefs), coefs.head()
 
@@ -182,12 +182,13 @@ class KineticsFeaturizer(object):
         coef_, scores_ = self._regress(X)
         return coef_, scores_
 
-    def predict(self, Z, coefs):
+    def predict(self, X, coefs):
         # first column of Z is time
         # we will replace the other columns with regressed data
-
+        Z = X.copy()
         for trial_index, (coefficients, x) in enumerate(izip(coefs, Z)):
             # only regress on data past reference time
+            t = (x[:,0]).reshape(-1,1)
             t = t[self.reference_time:]
 
             z = np.zeros(x.shape)
@@ -428,11 +429,18 @@ class DerivativeFeaturizer(object):
                         # print 'about to derive', fp.shape
                         for dummy in range(self.order):
                             # print 'derive loop', fp.shape
+                            if np.sum(np.isnan(fp)):
+                                print 'Incoming error T:%s, S:%s, O:%s' % (trial_index, spot_index, dummy)
                             fp, s = pade(fp, self.dx)
+                            if np.sum(np.isnan(fp)):
+                                print 'PADE error T:%s, S:%s, O:%s' % (trial_index, spot_index, dummy)
+
                             if self.gauss:
                                 fp = fp.T
                                 fp = gaussian_filter1d(fp, self.sigma)
                                 fp = fp.T
+                                if np.sum(np.isnan(fp)):
+                                    print 'Gauss error T:%s, S:%s, O:%s' % (trial_index, spot_index, dummy)
                             # print 'after derive', fp.shape, s.shape
                             # score += s
                         # print fp.shape, Xp[:, spot_index].shape

@@ -76,8 +76,8 @@ class SpotTimePlot(object):
         # groups, assuring that each has elements from each class
         y = self.y
         sss = StratifiedShuffleSplit(y=y['classification'],
-                                    n_iter=self.n_trial_groups,
-                                    test_size=1.0/self.n_trial_groups,
+                                    n_iter=1,
+                                    test_size=0.1,
                                     random_state=1)
 
         trial_groups = []
@@ -86,7 +86,8 @@ class SpotTimePlot(object):
 
         return trial_groups
 
-    def plot_fits(self, X, X_pred):
+    def plot_fits(self, X, X_pred, plot_preds = True):
+        self.plot_preds = plot_preds
         import matplotlib
         self.colors = ['r', 'g', 'b']
         more_colors = matplotlib.colors.cnames.keys()
@@ -95,7 +96,7 @@ class SpotTimePlot(object):
         # print more_colors
         self.colors.extend(more_colors)
 
-        # self.trial_groups = self.split_trial_groups()
+        self.trial_groups = self.split_trial_groups()
         self.X = X
         self.X_pred = X_pred
 
@@ -110,7 +111,7 @@ class SpotTimePlot(object):
         self.axclass = plt.axes([0.25, 0.15, 0.65, 0.03], axisbg=axcolor)
 
         # need to update to find the number of classes, trial_groups
-        self.strial = Slider(self.axtrial, 'Trial', 0, n_trial_groups, valinit=0)
+        self.strial = Slider(self.axtrial, 'Trial', 0, self.n_trial_groups, valinit=0)
         self.sspot = Slider(self.axspot, 'Spot', 1, len(self.column_headers), valinit=1)
         self.sclass = Slider(self.axclass, 'Class', 0, len(self.groups), valinit=0)
 
@@ -121,34 +122,47 @@ class SpotTimePlot(object):
         self.plot_fit(spot=1, group=0, trial=0, averages=self.averages)
         plt.show()
 
-    def plot_fit(self, spot=1, group=0, trial=0):
+    def plot_fit(self, spot=1, group=0, trial=0, averages=False):
         print 'S:%d, G:%d, T:%d' % (spot, group, trial)
         # raw, pred data, labels for this group of trials => trial
-        # raw_trials = self.X.iloc[self.trial_groups[trial]]
-        # pred_trials = self.X_pred.iloc[self.trial_groups[trial]]
-        # labels = self.y.iloc[self.trial_groups[trial]]
+        raw_trials = self.X.iloc[self.trial_groups[trial]]
+        pred_trials = self.X_pred.iloc[self.trial_groups[trial]]
+        labels = self.y.iloc[self.trial_groups[trial]]
 
         raw_trials = self.X
-        pred_trials = self.X_pred
         labels = self.y
 
         # get only those with right label => group
         mask = labels['classification'] == self.groups[group]
-        raw_trials = raw_trials[mask]
-        pred_trials = pred_trials[mask]
+        # raw_trials = raw_trials[mask]
+        # pred_trials = pred_trials[mask]
         plt.sca(self.ax)
         plt.cla()
-        # plot only this spot => spot
-        for i, (raw, pred) in enumerate(izip(raw_trials, pred_trials)):
-            # print i, raw
-            t = raw[:,0] # 0th column is time
-            raw = raw[:,spot]
-            pred = pred[:,spot]
 
-            # print i, t.shape, raw.shape, pred.shape
-            plt.plot(t, raw, color=self.colors[i], marker='o', linestyle='', alpha=0.5)
-            plt.plot(t, pred, color=self.colors[i])
-            plt.title(('S:%s, G:%s, T:%s' % (self.get_column_name(spot),self.groups[group],trial)))
+        if self.plot_preds:
+            # pred_trials = self.X_pred
+            # plot only this spot => spot
+            for i, (raw, pred) in enumerate(izip(raw_trials, pred_trials)):
+                # print i, raw
+                t = raw[:,0] # 0th column is time
+                raw = raw[:,spot]
+                pred = pred[:,spot]
+
+                print i, t.shape, raw.shape, pred.shape
+                plt.plot(t, raw, color=self.colors[i], marker='o', linestyle='', alpha=0.5)
+                plt.plot(t, pred, color=self.colors[i])
+                plt.title(('S:%s, G:%s, T:%s' % (self.get_column_name(spot),self.groups[group],trial)))
+        else:
+            for i, (raw, pred) in enumerate(izip(raw_trials, pred_trials)):
+                # print i, raw
+                t = raw[:,0] # 0th column is time
+                raw = raw[:,spot]
+                pred = pred[:,spot]
+
+                # print i, t.shape, raw.shape, pred.shape
+                plt.plot(t, raw, color=self.colors[i], alpha=0.5)
+                # plt.plot(t, pred, color=self.colors[i])
+                plt.title(('S:%s, G:%s, T:%s' % (self.get_column_name(spot),self.groups[group],trial)))
 
     def plot_raws(self, X, averages=True):
         import matplotlib
