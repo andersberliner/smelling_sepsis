@@ -1,6 +1,0 @@
-60_series
-ss_conda01
-
-Try DII with 2nd deriv featurizers, un-triggered
-
-60: logistic regression, ss, pca

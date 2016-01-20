@@ -1,6 +1,0 @@
-40_series
-ss_conda03
-
-Try DII with slope featurizers, un-triggered
-
-40: logistic regression, ss, pca
