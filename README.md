@@ -6,7 +6,7 @@ A cascading, series model to quickly and accurately predict the first three step
 
 + [What is sepsis?](#sepsis)
 + [How do we smell sepsis?](#csa)
-+ [Designing a Cascading, Series Model](#series)
++ [Designing a Cascading, Series Model](#cascadeseries)
 + [Longitudinal Analysis](#features)
 + [Designing a Triggered, Series Model](#trigger)
 + [Results](#results)
@@ -97,7 +97,7 @@ Thus, the Specific Technologies paradigm can provide for the first 3 steps of se
 
 Graciously, Specific Technologies provided me the raw data from their publication which I used to try out new approaches to their multi-class classification problem.
 
-## <a name="series"></a> Designing a Cascading, Series Model
+## <a name="cascadeseries"></a> Designing a Cascading, Series Model
 
 To build a model that will function appropriately on-board a piece of diagnostic equiment, it needs to provide the answers to all three of detection, gram, indentification questions as well as handle incoming data the same way it would be received in real time.  To do this, I built a custom a **cascading, series model**, which I explain below.
 
