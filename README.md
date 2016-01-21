@@ -59,25 +59,25 @@ With the susceptibility test results in hand, your doctor prescribes the appropr
 
 ## <a name="csa"></a> How do we smell sepsis?
 
-[Specific technologies](specifictechnologies.net) is a Mountain View start-up applying electronic nose technology to medical diagnostics.  Their technology is cheap and appropriate for low-resource conditions (like developing countries).  It revolves around detecting the color changes of an array of colorimetric indicators (think many flavors of [litmus paper](https://en.wikipedia.org/wiki/PH_indicator), so tailored to change color to a wide variety of chemical compounds beyond just changes in pH).  These so called **[Colorimetric Sensor Arrays](http://www.scs.illinois.edu/suslick/smell_seeing.html)**, or **CSAs**, were invented by Prof. Ken Suslick at the University of Illinois.  An example colorimetric sensor array is presented in Figure One, box A *(reproduced from [Lim et. al., J. Clin. Microbiol., 2014, 52 vol 2](http://jcm.asm.org/content/52/2/592.short
+[Specific technologies](specifictechnologies.net) is a Mountain View start-up applying electronic nose technology to medical diagnostics.  Their technology is cheap and appropriate for low-resource conditions (like developing countries).  It revolves around detecting the color changes of an array of colorimetric indicators (think many flavors of [litmus paper](https://en.wikipedia.org/wiki/PH_indicator), so tailored to change color to a wide variety of chemical compounds beyond just changes in pH).  These so called **[Colorimetric Sensor Arrays](http://www.scs.illinois.edu/suslick/smell_seeing.html)**, or **CSAs**, were invented by Prof. Ken Suslick at the University of Illinois.  An example colorimetric sensor array is presented in [Figure One, box A](fig01) *(reproduced from [Lim et. al., J. Clin. Microbiol., 2014, 52 vol 2](http://jcm.asm.org/content/52/2/592.short
 ))*.
 
-#### Figure One - Specific Technologies uses CSAs to diagnosis sepsis.
+#### <a name="fig01"></a> Figure One - Specific Technologies uses CSAs to diagnosis sepsis.
 *A colorimetric sensor array, (a), is placed on-top of a blood culture bottle, (c), and "smells" the headspace volatile organic compounds of bacteria as they grow via an opening or semi-permeable membrane in the bottle cap, (b).  Tests were performed at Stanford University in standard lab incubators using a lab shaker and custom rack, (d), where the CSAs where image through the cap by a flatbed scanner.*
 
 ![figure one - specific technologies](img/st.png)
 
 Each colored spot is a different color-changing **indicator** that responds to different sets of chemical compounds it interacts with, or "smells" (i.e. each spot is a chemical sensor).  Like mamalian-noses, each spot is not specifically responsive to one thing; the combination of their responses, rather, distinguishes the **volatile organic compounds**, or **VOCs**, the sensor array is "smelling".  Given the high dimensionality of these arrays, CSAs can distinguish thousands of different VOCs, and do so at low concentrations *(see, for example, [Feng et. al., Chem. Commun., 2010, 46, 2037-2039](http://www.scs.illinois.edu/suslick/documents/chemcomm.20102037.pdf).)* Furthermore, the high-dimensionality of these arrays allows for a "smell fingerprint" of cocktails of VOCs (i.e. complex mixtures of chemical compounds) which can be used to identify different things, including the different sets of respiration products of different species of bacteria (i.e. the different things different bacteria exhale as they grow).
 
-Specific Technologies is using CSAs to combine the first three steps of sepsis diagnosis, (detection, gram and identification), into one automated step, and signficantly speeding up the diagnositic timeline in the process.  The CSA, shown in Figure One a, is incorporated into a plastic cap that fits over a standard blood culture bottle, as shown in box c.  The caps are transparent so that they can be imaged, e.g. by a flatbed scanner, and the color of each spot can be tracked over time.  As bacteria grow, respiration VOCs accumulate in the headspace of the bottle (i.e. the gas above the liquid), and the CSA "smells" these volatiles by their passive diffusion through an opening in the lid or through a permeable membrane, as shown in b.  By imaging the CSAs at regular intervals and tracking the change of color of each spot (i.e. the red, green and blue components) over time, the response curves provide distinguishing signals for different species of bacteria.  Some example data for four classes of bacteria and individual color channels of 3 indicators are shown in Figure Two below (*(reproduced from [Lim et. al., J. Clin. Microbiol., 2014, 52 vol 2](http://jcm.asm.org/content/52/2/592.short
+Specific Technologies is using CSAs to combine the first three steps of sepsis diagnosis, (detection, gram and identification), into one automated step, and signficantly speeding up the diagnositic timeline in the process.  The CSA, shown in [Figure One a](fig01), is incorporated into a plastic cap that fits over a standard blood culture bottle, as shown in box c.  The caps are transparent so that they can be imaged, e.g. by a flatbed scanner, and the color of each spot can be tracked over time.  As bacteria grow, respiration VOCs accumulate in the headspace of the bottle (i.e. the gas above the liquid), and the CSA "smells" these volatiles by their passive diffusion through an opening in the lid or through a permeable membrane, as shown in b.  By imaging the CSAs at regular intervals and tracking the change of color of each spot (i.e. the red, green and blue components) over time, the response curves provide distinguishing signals for different species of bacteria.  Some example data for four classes of bacteria and individual color channels of 3 indicators are shown in [Figure Two](fig02) below (*(reproduced from [Lim et. al., J. Clin. Microbiol., 2014, 52 vol 2](http://jcm.asm.org/content/52/2/592.short
 )).*
 
-#### Figure Two - Example Response Data
+#### <a name="fig02"></a> Figure Two - Example Response Data
 *Example color difference image, (a), and time series (b) for 4 bacterial species and three indicators. The difference maps are the average (after - before) for each class at the time of indentification mapped onto the same grid as the physical arrays (Figure One a).  The values are shown via the spots color. The time series represent how one color channel (red, green or blue) for one indicator (one of the colored spots) have changed color over time (in hours since inncoulation), grouped by class.  They are shows as percent change in spot color (I(t)-I(0))/I(0), where I(t) is the median pixel intensity for a color channel (R,G,B) at time t.  The grouped responses of all of the indicators allows for classification.*
 
 ![figure one - specific technologies](img/data.png)
 
-In the experiments performed in [Lim et. al., J. Clin. Microbiol., 2014, 52 vol 2](http://jcm.asm.org/content/52/2/592.short), Specific Technologies and Dr. Niaz Banaei at Stanford University spiked blood culture bottles with known amounts of bacteria and pathogen free blood and tracked the response of CSAs as they sampled the bottles headspace.  For 1078 trials including 17 species of bacteria plus uninnoculated controls, they observed distinguishing resopnses such as those shown in Figure Two.  In a), the color difference maps show the overall pattern of color change of bacteria at a given time.  The difference maps are the average (after - before) for each class at the time of indentification mapped onto the same grid as the physical arrays (Figure One a).  The values are shown via the spots color.
+In the experiments performed in [Lim et. al., J. Clin. Microbiol., 2014, 52 vol 2](http://jcm.asm.org/content/52/2/592.short), Specific Technologies and Dr. Niaz Banaei at Stanford University spiked blood culture bottles with known amounts of bacteria and pathogen free blood and tracked the response of CSAs as they sampled the bottles headspace.  For 1078 trials including 17 species of bacteria plus uninnoculated controls, they observed distinguishing resopnses such as those shown in [Figure Two](fig02).  In a), the color difference maps show the overall pattern of color change of bacteria at a given time.  The difference maps are the average (after - before) for each class at the time of indentification mapped onto the same grid as the physical arrays (Figure One a).  The values are shown via the spots color.
 
 More interestingly, in b) time series responses of a few channels and bacteria are shown.  Each box in b) is a the percent change in color for one color channel (red, green or blue), where each line represents a single trial for a bacteria of that species.  Thus, one green line in row 1 column 1, one blue line in row 2, column 1 and one red line in row 3, column 1 would correspond to one "observation" *(see [data](#data) for more details)*.  The combination of the curve shapes for these different indicators provides the basis for: 
 
@@ -97,15 +97,19 @@ Thus, the Specific Technologies paradigm can provide for the first 3 steps of se
 
 Graciously, Specific Technologies provided me the raw data from their publication which I used to try out new approaches to their multi-class classification problem.
 
+### Project Definition
+
+My capstone project was to use machine learning technique to see how quickly and how accurately I could diagnose sepsis.
+
 ## <a name="cascadeseries"></a> Designing a Cascading, Series Model
 
 To build a model that will function appropriately on-board a piece of diagnostic equiment, it needs to provide the answers to all three of detection, gram, indentification questions as well as handle incoming data the same way it would be received in real time.  To do this, I built a custom a **cascading, series model**, which I explain below.
 
 ### Cascading
 
-It's a cascading model because, at each timestep, it answers the three questions in series and feeds the results of each forward (down the psuedo decision tree).  At each timestep, the model predicts detection first, and feeds the probability of positive as a feature to the gram model.  The gram model, similarly, feeds the gram positive and gram negative probabilities forward to the classification model, and the classification model also accepts the detection positive probability.  This is shown diagramatically in Figure Three.  
+It's a cascading model because, at each timestep, it answers the three questions in series and feeds the results of each forward (down the psuedo decision tree).  At each timestep, the model predicts detection first, and feeds the probability of positive as a feature to the gram model.  The gram model, similarly, feeds the gram positive and gram negative probabilities forward to the classification model, and the classification model also accepts the detection positive probability.  This is shown diagramatically in [Figure Three](fig03).  
 
-#### Figure Three - Classification Cascade
+#### <a name="fig03"></a> Figure Three - Classification Cascade
 *Cascading models for classification.  At each timestep, a detection model first predicts probabilities of each case.  The positive detection probability is fed forwad to the gram model, and the gram positive and gram negative probabilities (again, the control probability is omitted to maintain linear independence of the features) to the classification model.*
 ![Figure Three - cascade](img/cascade.png)
 
@@ -119,20 +123,54 @@ Although I haven't implemented these options yet (it's a relatively straightforw
 
 ### Series
 
-It's a series of models because it needs to answer the question of how quicly can you diagnose my sepsis, not just how accutately.  Consider again Figure Two, where the data extends to 18 hours.  Could you make the same predicitions about species if you only had, for example, half of the data (up to 9 hours)?  What about at 12 hours?  Since my objective is to not just accurately, but also quickly diagnose sepsis, early time model performance is extremely important.  Class difference at early times are much more subtle than at later times, so you would expect a model trained with 18 hours of data to perform poorly on only 6 hours of data, and vice versa (not to mention that, unless you are smart in your feature extraction, they are likely to require different numbers of features).
+It's a series of models because it needs to answer the question of how quicly can you diagnose my sepsis, not just how accutately.  Consider again [Figure Two](fig02), where the data extends to 18 hours.  Could you make the same predicitions about species if you only had, for example, half of the data (up to 9 hours)?  What about at 12 hours?  Since my objective is to not just accurately, but also quickly diagnose sepsis, early time model performance is extremely important.  Class difference at early times are much more subtle than at later times, so you would expect a model trained with 18 hours of data to perform poorly on only 6 hours of data, and vice versa (not to mention that, unless you are smart in your feature extraction, they are likely to require different numbers of features).
 
 To allow for course correction or increasing confidence of one diagnosis or the next, the models should inform each other.  I like to think of the "did I miss my turn" example when you're trying to get some place you haven't been to before.  Shortly after missing your turn, you might not be particularly confident one way or the other.  But as time continues and you continue to see unexpected landmarks, you would become more concerned.  It's not a memory-less process: each individual unexpected steet sign might not, on its own, convince you that your lost,  but their repeated observation is what makes you turn around.
 
-To accomplish this, I built a series of cascading models where the probabilities at the previous timestep are fed as additional features to the current timestep, shown diagrammatically in Figure Four.
+To accomplish this, I built a series of cascading models where the probabilities at the previous timestep are fed as additional features to the current timestep, shown diagrammatically in [Figure Four](fig04).
 
 
-#### Figure Four - Series of Models
+#### <a name="fig04"></a> Figure Four - Series of Models
 
 *A series of cascading models is constructed, where the set of probabilities from model built with i-1 timesteps, {p<sub>i-1</sub>}, is fed to the model cascade at time t<sub>i</sub>.*
 
 ![Figure Four - series](img/series.png)
 
 ## <a name="features"></a> Longitudinal Analysis
+
+The analysis of repeated measures of the same subjects is known as longitudinal analysis.  It's generally used in, for example, clinical trials where it's more cost effective to sign-up 100 people and track their health multiple times over the course of a few years than it is to sign up a 1,000 or 10,000 people and check their heath once. Then you answer questions like: do the participants receiving the cholesterol drug have different changes in LDL and HDL overtime versus the placebo group?  Can I predict which drug will be most effective for this patient given their health history and what I know about the efficacy of different drugs on similar patients?
+
+If you were to describe my problem in one sentence, it would be a multinomial logistitic regression problem with longitudinal effects.  So my first approach was to try and use these types of models.
+
+The big difference between linear or logistic regression in longitudinal analysis and standard regression is the structure of the covariance matrix.  When you regress, for example, engine size versus mpg, each data point is an individual car, so each observation is assumed independent.  Furthermore, it is assumed that a single variance, s<sup>2</sup>, describes the variance of each of the data points and is the diagonal of the covariance matrix.  The observations X<sub>i</sub> and X<sub>i+1</sub> are assumed to be not correlated (the off-diagonal terms in the covariance matrix are 0).  Regression is the fitting of a univariate normal distribution.
+
+In longitudinal analysis, the individual data points are necessarily not independent.  In our cholesterol drug, LDL/HDL example, if someone started with higher baseline cholesterol levels, you expect the next measure of their cholesterol to be somewhat close to the first measure.  This, effectively, means your data's distribution around any best fit line should be "tighter" than in the usual regression case.  Depending upon the level of correlation between repeated measures, the covariance can have many non-zero terms.  Regression is the fitting of a multivariate normal distribution where all the terms in the covariance matrix must be computed.
+
+I'm not aware of any python packages for generalized linear mixed effects *("generalized linear" since its logistic regression, "mixed effects" because of the mixed effects of repeated obervations from a single trial)*.  R has at least a couple of implementations: lme4 with glmr and mcmcglm.  I tried to use both of these with this project (and experimented with the rpy2 wrapper to access them through python), but unforunately they can't handle data of my type.  
+
+In mcmcglm, the structure of the covariance matrix can't be specified.  This matters because our 219 features (each of which is repeatedly observed 60-145 times), are necessarily correlated beyond just the each feature is correlated with itself in time.  Recall that the 219 features came from 73 spots broken into 3 color channels each.  Thus the color channels from a given spot are correlated *(another idea for future work is experimenting with different color scale transformations to more appropriately incorporate this into my models)*.  Additionally, many of the spots respond to the same chemical compounds.  As a toy example, presume both spot 5 and spot 6 respond to carbon dioxide.  Although they won't respond identically, once bacteria start to produce carbon dioxide in significant amounts, there responses will be correlated.
+
+lme4 allows for specifying the structure of the covariance matrix.  But I could not get it to converge for data of this size (see [data](#data) for more details).  In fact, even with very small subsets of the data, resulting in only 10,000 or so terms to estimate in the covariance matrix, I could not get this solution to converge.
+
+Fitzmaurice, Laird and Ware in their excellent [Applied Longitudinal Analysis, 2nd edition](http://www.hsph.harvard.edu/fitzmaur/ala2e/), provide sample datasets and sample R code for the use of lme4 and glmer to solve generalized linear mixed effects models.  You can view the sample code [here](http://www.hsph.harvard.edu/fitzmaur/ala2e/R_sect_16_5.html) (look at the second example), and download the data in text format [here](http://www.hsph.harvard.edu/fitzmaur/ala2e/ecg-data.txt) (and read about the source of the data [here](http://www.hsph.harvard.edu/fitzmaur/ala2e/ecg.txt)).  The solvers happily converge for data of this size (about 100 rows).
+
+### Feature Extraction via Curve Shape Parameters
+
+Since traditional longitudinal analysis would not work for my dataset, I needed to develop other feature extraction techniques that in some way incoporated the time-correlation of the repeated measures of each spot for a given trial.  I also wanted to limit my feature space to a sizeable amount since, at timestep 60, I could have 219 features X 60 times = 13,140 features for 1,078 trials.
+
+Recall from our inspection of the raw data in [Figure Two](fig02) that the shape of the curves more than the value at any given timestep are what makes different bacterial species distinguishable.  Thus, I suspected that extracting features to describe the shapes of the curves would be the best features.
+
+To incorporate time-correlation and extract a response curves shape, I curve fit the trace of each spot and each color (at each timestep) to two forms: n<sup>th</sup> order polynomials in time and sigmoidal in time.  That is, where DI<sub>i,j</sub> is the change in color of spot i over the set of timesteps {t<sub>0</sub>, t<sub>1</sub>,...,t<sub>}</sub>}, I fit:
+
++ DI<sub>i,j</sub>(t) = b<sub>0</sub> + b<sub>1</sub>t + b<sub>2</sub>t<sup>2</sup> + ... + b<sub>p</sub>t<sup>p</sup>
+	+ polynomial.  p = 4 (in best performing models)
++ DI<sub>i,j</sub>(t) = 1/(A + exp(-kt + B))
+	+ sigmoidal
+
+Polynomial fitting was easily accompolished using sklearn PolynomialFeatures to generate t, t<sup>2</sup>, ... , t<sup>p</sup> and regressing with either OLS, LassoCV or RidgeCV.  OLS did a fine job of keeping consistent shape parameters at late t and was computationally much faster than the grid-searching, regularization methods, for which I didn't notice significant model performance.  I demonstrate some example curves below with raw data and their fourth order fits in [Figure Five](fig05).
+
+#### <a name="fig05"></a> Figure Five
+*Examples of fourth order polynomimal fits for the change in color of a given spot in time, DI<sub>i,j</sub>(t).  The colored circles represent the raw data and the similarly colored line the fit.*
 
 ## <a name="trigger"></a> Designing a Triggered, Series Model
 
