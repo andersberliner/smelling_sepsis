@@ -217,7 +217,7 @@ Model tuning was particularly challenging for this product and remains an area w
 
 Here the blue circles represent the data being passed in at each timestep.  The orange circles are the featurizer, scaler and dimensionality reducer for detection, gram and classification at that timestep.  The green circles are the model for detection, gram and classification.  A zoom-in for a singletimestep is shown in [Figure Eight](#fig08).
 
-#### <a name="fig07"></a> Figure Eight - pseudo Neural Net architecture at timestep j
+#### <a name="fig08"></a> Figure Eight - pseudo Neural Net architecture at timestep j
 
 *The architecture of the cascading series model zoomed in to timestep j.  The color changes for all of the spots is fed in from the j<sup>th</sup> input layer as (DI{t<sub>0</sub>, t<sub>1</sub>,...,t<sub>j</sub>) to the featurizers (f<sub>d,j</sub>, f<sub>g,j</sub>, f<sub>c,j</sub>).  Here, f<sub>d,j</sub> is the featurizer (e.g. polynomial curve fit, sigmoidal curve fit, etc) for detection at the j<sup>th</sup> timestep.  Additionally, the probabilities calculated in the hidden layer of the j-1<sup>th</sup> timestep are fed in to their respective featurizers.  The extracted features are then scaled by the scalers (s<sub>d,j</sub>, s<sub>g,j</sub>, s<sub>c,j</sub>), and the number of features reduced by the dimensionality reducers (r<sub>d,j</sub>, r<sub>g,j</sub>, r<sub>c,j</sub>), with each featurizer feeding its respective scaler, each scaler feeding its respective reducer.  These final features are then passed to the respective classifier/model, where the detection model, g<sub>d,j</sub>, passes the detection probabilites, P<sub>d,j</sub>, to the gram model, g<sub>g,j</sub>, which passes the gram probabilities, P<sub>g,j</sub>, to the classification model, g<sub>c,j</sub>.  All of the probabilities are reported to the output layer, as well as passed along to the respective featurizer at the j+1<sup>th</sup> timestep.*
 
@@ -254,18 +254,24 @@ Featurization is a place where parralellization could help improve speed, but I 
 
 ### Crossvalidation
 
-I used sklearn's StratifiedShuffleSplit to generate 10 folds of 90% train, 10% test data where each classification label (17 bacterial species plus control) was evenly split over each of the folds.  All featuriers, scalers, reducers and models were trained on the training folds, and evaluated best on their predictions for the corresponding testing folds.  This generated a set of ~110*10 = 1,100 detection, 1,110 gram and 1,100 classification predictions for each timestep
+I used sklearn's StratifiedShuffleSplit to generate 10 folds of 90% train, 10% test data where each classification label (17 bacterial species plus control) was evenly split over each of the folds.  All featuriers, scalers, reducers and models were trained on the training folds, and evaluated best on their predictions for the corresponding testing folds.  This generated a set of ~110*10 = 1,100 detection, ~1,110 gram and ~1,100 classification predictions for each timestep.
 
 ### Model Evaluation
 
-I built up a suite of multiclass metrics and reporting in mutliclassmetrics.py.  This began with construction detection, gram and classification confusion matrices *(at each timestep)*, and then computing the various performance metrics on a one-versus-all and micro and macro averaged premise: accuracy, recall, precision, f1.  
-
-### Model Results
-
-My initial results showed promise.  All of the classification metrics improved with time
+I built up a suite of multiclass metrics and reporting in mutliclassmetrics.py.  This began with construction detection, gram and classification confusion matrices *(at each timestep)*, and then computing the various performance metrics on a one-versus-all and micro and macro averaged premise: accuracy, recall, precision, f1.  To pick the best model, I observed how all of these metrics evolved as more timesteps were included.  Recall that a perfect model has excellent metrics at a very early time. 
 
 
 ## <a name="trigger"></a> Designing a Triggered, Series Model
+
+My initial results were promising, but I felt there was still room for improvement.  Specifically, I was still subject to overfitting.  My hypothesis for why came from revisiting the color change responses for characteristic, early responding spots of a particular bacteria, as shown in [Figure Nine](#fig09) below.
+
+#### <a name="fig09"></a> Figure Nine - Varying "Trigger" Times
+*The color change versus time for one type of bacteria at one characteristic spot.  The curves all have very similar shapes, but at any given time, there exists a large variance in the curves' shape and values.  A reference time of t=4 hours was used for calculating the color change.*
+
+![Figure Nine - Varying "Trigger" Times](img/responses.png)
+
+As you can see in [Figure Nine](#fig09), the curve shapes are all similar.  Assuming the time at which the curves drastically change represents the time at which the bacteria in that particular observation entered their exponential growth phase, this time-shift in the curves represents the biological variability in the trials as well as the sampling variability in the precise amount of bacteria a given trial was innoculated with.
+
 
 ## <a name="results"></a> Results
 
