@@ -206,7 +206,7 @@ With the features extracted, I then used sklearn's standard scaler for each feat
 
 NOTE: the probabilities reported from each model were never scaled since they already exist on a 0-1 scale.  Additionally, only the curve shape parameters were reduced by PCA, with the probabilities from a previous timestep or higher up the decision cascade being appended after dimensionality reduction.
 
-### Model tuning and results
+### Model tuning
 
 Model tuning was particularly challenging for this product and remains an area where improvement can likely still be made.  Considering the desing of the cascading series model, I effectively created a neural network with inner layers reporting their probability.  I show this diagrammatically in [Figure Seven](#fig07).
 
@@ -227,8 +227,42 @@ As described in [Figure Three](#fig03), the model is cascading: at each timestep
 
 Put all together, for the ~ 50 timesteps I considered, I created 3 featurizers, 3 scalers, 3 dimensionality reducers and 3 models.  These all interact with each other, as shown in the interactions at a given timestep in [Figure Eight](#fig08).  This means I have 150 interdependent models, featurizers, scalers and reducers all of which have tuning hyperparameters.  This is an enormous model space to explore and one I continue to explore now to find better performance.
 
-To handle searching this model space I made a few simplifications.  I created a job-runner file, capstone.py, that accepts a runid on the command line that corresponds to where the output results should be written and from what json the run parameters should be picked.  I placed a sample json in the data folder.  The json describes how the SeriesModel object (my class for handling the models illustrated in [Figure Seven](#fig07) and [Figure Eight](#fig08)
+To handle searching this model space I made a few simplifications.  I created a job-runner file, capstone.py, that accepts a runid on the command line that corresponds to where the output results should be written and from what json the run parameters should be picked.  I placed a sample json in the data folder.  The json describes how the SeriesModel object (my class for handling the models illustrated in [Figure Seven](#fig07) and [Figure Eight](#fig08)) is constructed.
 
+Furthermore, I required the type of featurizer, scaler, reducer and classifier/model for each timestemp to be consistent (and stated in the run parameters json).  These are, e.g., the detection-base-model and detection-base-model-arguments, detection-base-featurizer, detection-base-featurizer-arguments, etc. of the SeriesModel class.  A summary of the types of models, featurizers, scalers and reducers I experimented with is listed below:
+
++ Featurizer
+	+ polynomial: 3rd or 4th order
+	+ sigmoidal
+	+ NoneType *(i.e. pass in all of the features as is)*
++ Scaler
+	+ Standard
+	+ NoneType *(i.e. does no scaling)*
++ Dimensionality Reducers
+	+ PCA: 10, 30, 40 or p components, where p is the number of features extracted by the Featurizer
+	+ NoneType *(i.e. does no dimensionality reduction)*
++ Models
+	+ Logistic Regression: regularization of 0.1, 1 and 10
+	+ Logistic Regression CV: auto-optimizes the regularization parameter via gridsearching
+	+ Stochastic Gradient Descent Boosting Classifier
+	+ SVM Classifier: 0.1, 1, 10 penalty parameter
+	+ Random Forest Classifier: 10, 50, 100 trees
+
+I ran these jobs by spinning up EC2 instances.  The "slow" step is the featurization, so I typically did this up front and pickled the results to pass along to other models using the same detection, gram and classifier featurization methods.  Thus, the SeriesModel class contains a load_state parameter to describe where to "start" the model from.
+
+Featurization is a place where parralellization could help improve speed, but I didn't have time to translate it to pyspark.  This is another area of work in progress.
+
+### Crossvalidation
+
+I used sklearn's StratifiedShuffleSplit to generate 10 folds of 90% train, 10% test data where each classification label (17 bacterial species plus control) was evenly split over each of the folds.  All featuriers, scalers, reducers and models were trained on the training folds, and evaluated best on their predictions for the corresponding testing folds.  This generated a set of ~110*10 = 1,100 detection, 1,110 gram and 1,100 classification predictions for each timestep
+
+### Model Evaluation
+
+I built up a suite of multiclass metrics and reporting in mutliclassmetrics.py.  This began with construction detection, gram and classification confusion matrices *(at each timestep)*, and then computing the various performance metrics on a one-versus-all and micro and macro averaged premise: accuracy, recall, precision, f1.  
+
+### Model Results
+
+My initial results showed promise.  All of the classification metrics improved with time
 
 
 ## <a name="trigger"></a> Designing a Triggered, Series Model
