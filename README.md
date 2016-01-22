@@ -200,9 +200,33 @@ This connection to chemical and biological processes made me strongly believe co
 
 With a small number of timesteps fed in, using scipy's curve_fit function, a broad family of parameters will fit the data.  And since the cost function is not globally convex, the paramters chosen pick a sigmoid that plateaus at the maximum value yet perceived.  You can see in the legend that A, k and C are all poorly approximated for a small number of timesteps fed in.  Thus, despite its chemial and biological relevancy, sigmoidal curve shape parameters did not perform well when model tuning.
 
+### Scaling and Dimensionality Reduction
+
+With the features extracted, I then used sklearn's standard scaler for each feature (at each timestep) since many classification models are sensitive to features on very different numeric scales.  I also reduced the dimensions with PCA to go from 73 spots X 3 colors X 3-4 curve shape parameters = 657-876 features per timestep to a smaller number (say 30-40).  Here again I used sklearn's PCA, specifying the number of components in the output.
+
+NOTE: the probabilities reported from each model were never scaled since they already exist on a 0-1 scale.  Additionally, only the curve shape parameters were reduced by PCA, with the probabilities from a previous timestep or higher up the decision cascade being appended after dimensionality reduction.
+
 ### Model tuning and results
 
-Model tuning was particularly challenging for this product and remains an area where improvement can likely still be made.  Considering the desing of the cascading series model, I effectively created a neural network with inner layers reporting their probability.  I show this diagrammatically in Figure Seven.
+Model tuning was particularly challenging for this product and remains an area where improvement can likely still be made.  Considering the desing of the cascading series model, I effectively created a neural network with inner layers reporting their probability.  I show this diagrammatically in [Figure Seven](fig07).
+
+#### <a name="fig07"></a> Figure Seven - pseudo Neural Net architecture
+*The architecture of the cascading series model.  Input layers: At each timestep, the color changes for all of the spots up to that timestep (DI{t<sub>0</sub>, t<sub>1</sub>,...,t<sub>j</sub>) are fed in to the model.  Hidden layers: A featurizer (F<sub>d,j</sub> for detection, F<sub>g,j</sub> for gram, F<sub>c,j</sub> for classification) extracts, scales and does dimensionality reduction on the relevant features and passes them to the models (g<sub>d,j</sub>, g<sub>g,j</sub>, g<sub>c,j</sub>.  The models pass the probabilities of detection, gram and classification to the output layers as well as to the next timestep's hidden layers.*
+
+![Figure Seven - pseudo Neural Net architecture](img/neural1.png)
+
+Here the blue circles represent the data being passed in at each timestep.  The orange circles are the featurizer, scaler and dimensionality reducer for detection, gram and classification at that timestep.  The green circles are the model for detection, gram and classification.  A zoom-in for a singletimestep is shown in [Figure Eight](fig08).
+
+#### <a name="fig07"></a> Figure Seven - pseudo Neural Net architecture
+
+*The architecture of the cascading series model zoomed in to timestep j.  The color changes for all of the spots is fed in from the j<sup>th</sup> input layer as (DI{t<sub>0</sub>, t<sub>1</sub>,...,t<sub>j</sub>) to the featurizers (f<sub>d,j</sub>, f<sub>g,j</sub>, f<sub>c,j</sub>).  Here, f<sub>d,j</sub> is the featurizer (e.g. polynomial curve fit, sigmoidal curve fit, etc) for detection at the j<sup>th</sup> timestep.  Additionally, the probabilities calculated in the hidden layer of the j-1<sup>th</sup> timestep are fed in to their respective featurizers.  The extracted features are then scaled by the scalers (s<sub>d,j</sub>, s<sub>g,j</sub>, s<sub>c,j</sub>), and the number of features reduced by the dimensionality reducers (r<sub>d,j</sub>, r<sub>g,j</sub>, r<sub>c,j</sub>), with each featurizer feeding its respective scaler, each scaler feeding its respective reducer.  These final features are then passed to the respective classifier/model, where the detection model, g<sub>d,j</sub>, passes the detection probabilites, P<sub>d,j</sub>, to the gram model, g<sub>g,j</sub>, which passes the gram probabilities, P<sub>g,j</sub>, to the classification model, g<sub>c,j</sub>.  All of the probabilities are reported to the output layer, as well as passed along to the respective featurizer at the j+1<sup>th</sup> timestep.*
+
+![Figure Eight - pseudo Neural Net architecture aat timestep j](img/neural2.png)
+
+As described in [Figure Three](fig03), the model is cascading: at each timestep, the detection classifier, g<sub>d,j</sub>, feeds the gram classifier, g<sub>g,j</sub>, which feed the classification classifier, g<sub>c,1</sub>.  The model is series as in [Figure Four](fig04) since the classifiers at timestep j pass their results along to timestep j+1 (g<sub>d,j</sub> connects to F<sub>d,j+1</sub>).  This could be described as the hidden layers of a neural net.  The input layers are the passing in of data up to that timestep, and the output layers are the reported probabilities at each timestep.
+
+Put all together, for the ~ 50 timesteps I considered, I created 3 featurizers, 3 scalers, 3 dimensionality reducers and 3 models.  These all interact with each other, as shown in the interactions at a given timestep in [Figure Eight](fig08).  This means I have 150 interdependent models, featurizers, scalers and reducers all of which have hyperparameters.
+
 
 
 ## <a name="trigger"></a> Designing a Triggered, Series Model
