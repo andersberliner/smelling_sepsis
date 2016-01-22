@@ -263,15 +263,57 @@ I built up a suite of multiclass metrics and reporting in mutliclassmetrics.py. 
 
 ## <a name="trigger"></a> Designing a Triggered, Series Model
 
-My initial results were promising, but I felt there was still room for improvement.  Specifically, I was still subject to overfitting.  My hypothesis for why came from revisiting the color change responses for characteristic, early responding spots of a particular bacteria, as shown in [Figure Nine](#fig09) below.
+My initial results from the cascading series models were promising, but I felt there was still room for improvement.  Specifically, I was still subject to some overfitting.  My hypothesis for why came from revisiting the color change responses for characteristic, early responding spots of a particular bacteria, as shown in [Figure Nine](#fig09) below.
 
 #### <a name="fig09"></a> Figure Nine - Varying "Trigger" Times
 *The color change versus time for one type of bacteria at one characteristic spot.  The curves all have very similar shapes, but at any given time, there exists a large variance in the curves' shape and values.  A reference time of t=4 hours was used for calculating the color change.*
 
 ![Figure Nine - Varying "Trigger" Times](img/responses.png)
 
-As you can see in [Figure Nine](#fig09), the curve shapes are all similar.  Assuming the time at which the curves drastically change represents the time at which the bacteria in that particular observation entered their exponential growth phase, this time-shift in the curves represents the biological variability in the trials as well as the sampling variability in the precise amount of bacteria a given trial was innoculated with.
+As you can see in [Figure Nine](#fig09), the curve shapes are all similar.  At any given time, however, there exists a large variance in the curves' shape and values.  Assuming the time at which the curves drastically change represents the time at which the bacteria in that particular observation entered their exponential growth phase, this time-shift in the curves represents the biological variability in the trials as well as the sampling variability in the precise amount of bacteria a given trial was innoculated with.  I wondered if I could collapse these curves on to some new time scale, t* = t - tau, where tau was the "growth" time, or time at which the big changes in these curves appeared.
 
+Looking at the full 20 hours of the curve, it is clear that the time at which the absolute maximum first or absolute maxium second derivaties occur whould be a good estimate of the taus, the "trigger" times, for each of these samples.  I show a couple examples of this in [Figure Ten](#fig10).
+
+#### <a name="fig10"></a> Figure Time - Finding the "Trigger Times"
+
+*Two examples of finding the "trigger" times for characteristic spots.  The blue circles represent the raw data.  The red, vertical lines show the time at which the absolute maximum first derivative occurred.  The green, vertical lines show the time at which the absoluted maximum second derivative occurred.  Numerical derivatives were calculated using a fourth order centralized pade scheme with third order boundaries.  These were then smoothed with a gaussian kernel with sigma=2.*
+
+![Figure Ten - Finding "Trigger" Times](img/trigger.png)
+
+Looking at the full time curve as shown in [Figure Ten](#fig10), simple backward differencing can correctly find the absolute maxium derivatives.  But, thinking forward to how you could detect if a trial had "triggered" in real time, I needed a differentiation scheme that would have low errors at the boundaries.  I imagined building a "trigger" model that, once a trial was confidently predicted to have entered this exponential groth phase, would send the data to the t* = 0 gram and classification models.  I needed to be able to collapse the curves by time-shifting and I needed to know how to do that time-shifting as each individual timestep was fed in.
+
+Simple forwards or backwards differencing is subject to large numerical errors at the boundaries, so I constructed a centralized, fourth-order pade differentiation scheme with third order boundaries.  This provides a highly accurate estimate of the derivative of a curve by the solution of a matrix algebra problem.  You have to solve a tridiagonal jxj matrix multiplication problem, where j is the number of timesteps, but numpy's linalg.lstsq can do so quickly.  To add in an extra layer of numerical robustness, I further smoothed this results with a gaussian kernel *(sigma=2 worked the best)* to accurately predict this time of max change.
+
+To determine if this trigger time had been reached, I trained a new set of models using the features of absolute max first and second derivatives from a handful of spots that consistently respond quickly for all types of bacteria.  This "Triggered, Series" model was asked to predict if a sample was innoculated, deteciton = 0 or 1, based ont the features calculated for the the timesteps up to that point.  Because the controls representeted ~ 10% of all samples in the available dataset, I used SMOTE oversampling on the training set when training the models to assure always predicitng detection=1 was not a viable model.  The ROC curves and other metrics showed significantly improved performance over the unshifted cascading, series model for detection.  They improved over time up to a high plateau at around 12 hours fed in.  Thus, I had found a time invariant feature that my models could use to predict when growth had occurred and, thus, the trigger time neccessary to shift the timescale before feeding in the data to the cascading series model.
+
+The best way to see this is from kernel density estimates of the observed number of timesteps versus the estimated time of absolute maximum derivative, shown in [Figure Eleven](#fig11) below.
+
+#### <a name="fig11"></a> Figure Eleven - KDE of Observed Time vs. Time of Absolute Max Derivative
+
+*Kernel density estimates of the observed time vs. time of absolute maximum derivative for a characteristic spot for two different species of bacteria.  The x-axis represents the number of timesteps observed while the y-axis represents the time at which the maximum absolute first derivative was observed for the timesteps up to that point.  The shading represents the frequency of observations.  The horizontal band of dark shading at later times shows that the trigger time remains constant after it has been passed.*
+
+![Figure Eleven - KDE of Observed Time vs. Time of Absolute Max Derivative](img/kde.png)
+
+[Figure Eleven](#fig11) represents the pair-wise density of (number of timesteps observed, time at which absolute maximum first derivative occurred) for two species of bacteria.  You can see that the majority of observations, indicated by the moderate shading, at early times are dispersely spread under the line y = x.  This means that until the "trigger" time is reached, the maximum derivative may have occurred at any time.  Since the curves are relatively flat before the trigger time, this makes sense - random fluctuations could make any change the "max" change before the "trigger" time.  But, since this corresponds to small values of the max change since these fluctuations are small compared to large change that occurs at the trigger time, our model shouldn't predict detection at these early times.
+
+At later times, starting at around 14 hours for the curve on the left, 10 hours for the curve on the right, a dark horizontal band occurs at y=14 and y=10, respectively.  This means that once the "trigger" time has been reached, it is always returned as the time of absolute maximum first derivative.  Furthermore, if our model is tuned to predict detection = 1 based on the value of that absolute maximum derivative, we can sucessfully predict that a particular trial has "triggered" in real time, i.e. one timestep at a time.
+
+To pick such a model from my set of models generated at each timestep, I considered the kernel density estimates of detection = 0  (controls), vs. detection = 1 (innoculated samples), shown in [Figure Twelve](#fig12) below.
+
+#### <a name="fig12"></a> Figure Twelve - KDE of Observed Time vs. Time of Absolute Max Derivative for controls and innoculated samples
+
+*Kernel density estimates of the observed time vs. time of absolute maximum derivative for a characteristic spot for controls (right in blue) and all species of bacteria (left in red).  The x-axis represents the number of timesteps observed while the y-axis represents the time at which the maximum absolute first derivative was observed for the timesteps up to that point.  The shading represents the frequency of observations.*
+
+![Figure Twelve - KDE of Observed Time vs. Time of Absolute Max Derivative for control vs. innoculated samples](img/kde2.png)
+
+As was seen when comparing classification metrics versus time (e.g. recall), at around 12 hours observed, we have a high density of observation of maximum derivative also at 12 hours for the innoculated case (left in red).  For the control (right in blue), shading remains relatively diffuse over the full timescale and certainly no more dense at 12 hours observed.  This suggests that the 12 hours observed model can effectively find the "trigger" time for all samples.  I am currently in the process of retraining my cascading series model based on my best performing "trigger" model at 12 hours:
+
++ Model: Random forest with 100 trees
++ Features: Absolute maximum first and second derivatives from 5 spots showing early growth (10 total features)
++ Scaling: Standard Scaling
++ Dimensionality Reduction: PCA with 10 components
+
+The "trigger" model determines the time-scale shift and gram and classification models are built at the tau = 0, tau = 20 minutes, ..., etc. timesteps.
 
 ## <a name="results"></a> Results
 
@@ -280,7 +322,6 @@ Due to the sensitive nature of the data used, detailed results beyond what has b
 ## <a name="install"></a> Installation and Dependencies
 
 The best way to try-out the code yourself is to clone this repo:
-
 ```
 git clone https://github.com/andersberliner/smelling_sepsis.git
 ```
