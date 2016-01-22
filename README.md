@@ -14,6 +14,7 @@ A cascading, series model to quickly and accurately predict the first three step
 + [Data format and data structures](#data)
 + [Code walkthrough and examples](#code)
 + [Contact](#contact)
++ [Release Notes](#release)
 
 
 ## <a name="sepsis"></a> What is sepsis?
@@ -344,7 +345,7 @@ Use cases are shown [here](https://github.com/fmfn/UnbalancedDataset/blob/master
 
 If you want to try and use R functionalities in your python programs, know that rpy2 can be particularly challenging to get onto Amazon EC2 instances.  See their documentation for more help.
 
-The code was designed to work with the Specific Technologies data pipline *(see [data structures](#data) to learn how to use it "out-of-the-box")*, and has some pieces built specifically around their use-case *([seriesmodel.py](/seriesmodel.py) currently only supports three-class label cascades)*.  That aside, I do believe there are a variety of other use cases where you could use this algorithm effectively with little effort.  See the [code walkthrough](#code) and please [contact me](#contact) for more help.
+The code was designed to work with the Specific Technologies data pipeline *(see [data structures](#data) to learn how to use it "out-of-the-box")*, and has some pieces built specifically around their use-case *([seriesmodel.py](/seriesmodel.py) currently only supports three-class label cascades)*.  That aside, I do believe there are a variety of other use cases where you could use this algorithm effectively with little effort.  See the [code walkthrough](#code) and please [contact me](#contact) for more help.
 
 ## <a name="data"></a> Data format and data structures
 
@@ -466,4 +467,16 @@ STP.plot_raws(X)
 [capstone r tools](capstone_r_tools.py) contains the tools to take data and pivot it to be in a format for R.
 
 ## <a name="contact"></a> Contact
-Like all of you out there developing your own models, it is my hope	
+Like all of you out there developing your own models, it is my hope that others can use the architecture I've developed to solve their own problems.  If you'd like to try it yourself and have any questions, just drop me a line.
+
+anders DOT berliner AT gmail DOT com
+
+## <a name="release"></a> Release Notes
+The Jan, 2016 release is limited to only 3 label classes in SeriesModel.  Future releases will contain the following improvements:
+
++ arbitrary number of label classes
++ pyspark parallelization support for featurization
++ model.predict, model.score behavior identical to that expected of sklearn objects
++ flat and stacked classification model support
+
+The next release is expected in early Feb, 2016.  Check-back for more updates.	
