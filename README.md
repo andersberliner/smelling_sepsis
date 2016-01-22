@@ -394,9 +394,76 @@ sm.fit(X,y)
 
 Here run_params is a dictionary loaded from the run parameters json containing all of the initialization variables for a SeriesModel object.  A full description of all of the initialization variables is available in the docstring.
 
-The results and scores are in sm.results and sm.scores following the fit.  I did this as opposed to creating the sm.predict and sm.score methods because my dataset did not have enough examples of every class to create a reasonably sized train, test and hold-set.  Instead, I generated cross-validation folds and trained the model at each timestep based on the 10 training folds, then scored based on the predictions for the 10 testing folds.  To save computational time, it was faster to train, predict, score at each timestep than to train at each timestep first, then re-iterate over each timestep to predict and score the test set.
+The results and scores are in sm.results and sm.scores following the call of sm.fit(X,y).  I did this as opposed to creating the sm.predict and sm.score methods because my dataset did not have enough examples of every class to create a reasonably sized train, test and hold-set.  Instead, I generated cross-validation folds and trained the model at each timestep based on the 10 training folds, then scored based on the predictions for the 10 testing folds.  To save computational time, it was faster to train, predict, score at each timestep than to train at each timestep first, then re-iterate over each timestep to predict and score the test set.
 
-[
+[triggeredseriesmodel.py](triggeredseriesmodel.py) contains the TriggeredSeriesModel class.  It is a child of the SeriesModel class, but has different fit method and different default initialization paramters.  Since it is expected that the user will use a smaller subset of features for a triggered series model, the column_headers for the features before a subset are selected are required at initialization.  The fit call is the same as for SeriesModel:
+
+```python
+from triggeredseriesmodel import TriggeredSeriesModel
+tsm = TriggeredSeriesModel(column_headers, **run_params)
+tsm.fit(X,y)
+```
+
+capstone.py passes in these column_headers, created as the raw data is being loaded.  Results are stored in the same manner as for SeriesModel objects.
+
+[featurizer.py](featurizer.py) contains the various featurization classes, including polynomial, sigmoidal and derivative.  You specify the type of featurizer and the featurizer initialization parameters in the run json.  Each featurizer has a fit and predict method to return the model coefficients, R2 values as well as fitted data.  For a polynomial featurization, for example, you would call as follows:
+
+```python
+from featurizer import PolynomialFeaturizer
+PF = PolynomialFeaturizer(n=4, reference_time=2, verbose=True)
+mycoefs, myscores = PF.fit_transform(X)
+X_fit = PF.predict(X, mycoefs)
+```
+
+Here X is a pandas data series as described in [data](#data).  You included X in the call to the predict method so you don't have extract a new dataframe containing just the times you want to fit at.
+
+The DerivativeFeaturizer behaves slightly differently in that instead of returning scores, it returns the time of absolute maximum derivatives *(the "trigger" time)* as its second return value.
+
+```python
+from featurizer import DerivativeFeaturizer
+deriv = DerivativeFeaturizer(order=1, dx=1, reference_time=2)
+Xp, triggerp = deriv.fit_transform(X)
+
+Xpp, triggerpp = deriv2.fit_transform(X)
+deriv2 = DerivativeFeaturizer(order=2, dx=1, reference_time=2)
+```
+
+[notetype.py](nonetype.py) contains the NoneTypeFeaturizer, NoneTypeScaler and NoneTypeReducer classes.  These classes simply .method(X), return X methods to keep the structure of the SeriesModel and TriggeredSeriesModels .fit methods the same even if you want to run a job without extract curve shape parametes, without scaling the data or without performing any dimesionality reduction. 
+
+[multiclassmetrics.py](multiclassmetrics.py) contains all of the functions to compute classification metrics on a one versus the rest (ovr) basis.  Consult the docstrings for information on each function.  A summary of all the metrics can be created via the classification_report_ovr.
+
+```python
+from multiclassmetrics import classification_report_ovr
+print classification_report_ovr(yt, yp, label_names)
+```
+
+Here yt are the true labels, yp the predicted labels, and label_names is a numpy array of the set of label names in the order you'd like to see them on the classification report.
+
+[math_capstone.py](math_capstone.py) contains the numeric diffentiator based on the pade scheme, as well as the sigmoid function of [eqn02](#eqn02) where A, C and k can be specified.  See the docstrings for more information.
+
+[utils_seriesmodel.py](utils_seriesmodel.py) and [utils_capstone.py](utils_capstone.py) contain a variety of utilities for file i-o and data frame slicing.
+
+[timeseriesplotter.py](timeseriesplotter.py) contains the SpotTimePlot class, which creates a dynamic plot to view the raw data.  To view how well the fits of your featurizer fit the raw data, you would call for example:
+
+```python
+from timeseriesplotter import SpotTimePlot
+STP = SpotTimePlot(y, column_headers)
+STP.plot_fits(X, X_fit)
+```
+
+column_headers are the names of the columns in the numpy arrays of the X pandas dataseries.  y is the y pandas dataframe containing the labels for each trial.  X is that dataseries and X_fit the result of our featurizer.
+
+Similarly, you can call plot_raws to dynamically view the raw data of all classes at once, or an average of all classes, for different spots via:
+
+```python
+STP.plot_raws(X)
+```
+
+[output_capstone.py](output_capstone.py) contains the print_to_file_and_terminal function, which allows for either the printing to a logfile or the terminal of a runs progress.
+
+[visualization_capstone.py](visualization_capstone.py) contains the plotting functions for results (i.e. roc plots, metrics vs. time, kde plots, etc.).  See the docstrings for more details.
+
+[capstone r tools](capstone_r_tools.py) contains the tools to take data and pivot it to be in a format for R.
 
 ## <a name="contact"></a> Contact
 Like all of you out there developing your own models, it is my hope	
