@@ -15,7 +15,7 @@ import re
 import datetime
 import time
 from seriesmodel import SeriesModel
-from tsm import TriggeredSeriesModel
+from triggeredseriesmodel import TriggeredSeriesModel
 from unittests import run_unittests
 from tsm_unittests import run_tsm_unittests
 from visualization_capstone import make_series_plots, make_trigger_plots

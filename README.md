@@ -250,7 +250,7 @@ Furthermore, I required the type of featurizer, scaler, reducer and classifier/m
 
 I ran these jobs by spinning up EC2 instances.  The "slow" step is the featurization, so I typically did this up front and pickled the results to pass along to other models using the same detection, gram and classifier featurization methods.  Thus, the SeriesModel class contains a load_state parameter to describe where to "start" the model from.
 
-Featurization is a place where parralellization could help improve speed, but I didn't have time to translate it to pyspark.  This is another area of work in progress.
+Featurization is a place where paralellization could help improve speed, but I didn't have time to translate it to pyspark.  This is another area of work in progress.
 
 ### Crossvalidation
 
@@ -274,9 +274,9 @@ As you can see in [Figure Nine](#fig09), the curve shapes are all similar.  At a
 
 Looking at the full 20 hours of the curve, it is clear that the time at which the absolute maximum first or absolute maxium second derivaties occur whould be a good estimate of the taus, the "trigger" times, for each of these samples.  I show a couple examples of this in [Figure Ten](#fig10).
 
-#### <a name="fig10"></a> Figure Time - Finding the "Trigger Times"
+#### <a name="fig10"></a> Figure Ten - Finding the "Trigger Times"
 
-*Two examples of finding the "trigger" times for characteristic spots.  The blue circles represent the raw data.  The red, vertical lines show the time at which the absolute maximum first derivative occurred.  The green, vertical lines show the time at which the absoluted maximum second derivative occurred.  Numerical derivatives were calculated using a fourth order centralized pade scheme with third order boundaries.  These were then smoothed with a gaussian kernel with sigma=2.*
+*Two examples of finding the "trigger" times for characteristic spots.  The blue circles represent the raw data.  The red, vertical lines show the time at which the absolute maximum first derivative occurred.  The green, vertical lines show the time at which the absolute maximum second derivative occurred.  Numerical derivatives were calculated using a fourth order centralized pade scheme with third order boundaries.  These were then smoothed with a gaussian kernel with sigma=2.*
 
 ![Figure Ten - Finding "Trigger" Times](img/trigger.png)
 
@@ -348,9 +348,55 @@ The code was designed to work with the Specific Technologies data pipline *(see 
 
 ## <a name="data"></a> Data format and data structures
 
+The raw data consisted of a csv file containing a list of trial labels and locations of the data for that trial.
 
-## <a name="code"></a>Code walkthrough and examples
+The raw data for each trial is in a tsv text file, where each line of the file is the data for that timestep, including:
 
+- STR: image name (containing the time stamp.  Images taken every 20 minutes starting with a first image shortly after innoculation - when the bottle was prepared)
+- FLOAT: spot one median R pixel intensity (16 bit image sampled at 12 bits).  Typically ranges from 1000-4000.
+- FLOAT: spot two median G pixel intensity
+- FLOAT: 1B
+- FLOAT: 2R
+- ...
+- FLOAT: spot 80 median B pixel intensity
+
+I loaded this data into a pandas series for that data, X, and a pandas dataframe for the labels, y, where each row of the dataframe was a trial.  
+
+In X, the index of each row is the trial-id and the data is a number of times X (number of features + 1) numpy array.  When loading the data, I pruned the orientation spots to get from 240 to 219 total features.  The additional column of the numpy array was for the time, in minutes elapsed, since that start of the trial.
+
+In y, the index of each row is again the trial-id, and the "detection", "gram" and "classification" labels were interpretted from the trial label (containing the species) and a dictionary loaded from a [csv file](species_to_gram2.csv) to assign detection, gram and classification labels from that trial label.
+
+For featurization at each timestep, the X pandas series had the numpy array of each trial trimmed to number of timesteps X number of features + 1.  The featurizers take these pandas series and convert them into a single numpy array, where each row represents a trial and the curve shape parameters for each of the features flattened into a row vector are the values (number of trials X number of features*number of curve shape parameters + 1).
+
+The scalers and reducers then worked with these numpy arrays, and the models worked with the reduced numpy arrays (number of trials X number of components included from PCA).
+
+The models returned predictions as a number of trials X 1 numpy array and probabilities as a number of trials X number of classes numpy array.
+
+Results were stored as an instance variable of the SeriesModel class as dictionaries of dataframes (for detection, gram and classification).  See [seriesmodel.py](seriesmodel.py) for more details.  The numpy arrays generated from featurization, scaling and reducing could either be stored as instance variables of the SeriesModel class or written to disk (for use by future runs) as dictionaries of numpy arrays.
+
+## <a name="code"></a>Code walkthrough
+
+[capstone.py](capstone.py) is the "job-runner", which fits and evaluates a triggered or cascading series model based on the parameters contained in json file declared as a command-line argument.  The json contains all of the initialization parameters for TriggeredSeriesModel or SeriesModel created in a capstone.py run.  For example, to evaluate a model given the parameters in run001.json, you would run the following command:
+
+```bash
+python capstone.py run001
+```
+
+Results are stored in the run001 folder.
+
+[seriesmodel.py](seriesmodel.py) contains the SeriesModel class.  Given an X and y dataframe that fits the structures described in [data](#data), it behaves similarly to an sklearn classifier:
+
+```python
+from seriesmodel import SeriesModel
+sm = SeriesModel(**run_params)
+sm.fit(X,y)
+```
+
+Here run_params is a dictionary loaded from the run parameters json containing all of the initialization variables for a SeriesModel object.  A full description of all of the initialization variables is available in the docstring.
+
+The results and scores are in sm.results and sm.scores following the fit.  I did this as opposed to creating the sm.predict and sm.score methods because my dataset did not have enough examples of every class to create a reasonably sized train, test and hold-set.  Instead, I generated cross-validation folds and trained the model at each timestep based on the 10 training folds, then scored based on the predictions for the 10 testing folds.  To save computational time, it was faster to train, predict, score at each timestep than to train at each timestep first, then re-iterate over each timestep to predict and score the test set.
+
+[
 
 ## <a name="contact"></a> Contact
 Like all of you out there developing your own models, it is my hope	
