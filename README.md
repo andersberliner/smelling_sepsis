@@ -158,19 +158,52 @@ Fitzmaurice, Laird and Ware in their excellent [Applied Longitudinal Analysis, 2
 
 Since traditional longitudinal analysis would not work for my dataset, I needed to develop other feature extraction techniques that in some way incoporated the time-correlation of the repeated measures of each spot for a given trial.  I also wanted to limit my feature space to a sizeable amount since, at timestep 60, I could have 219 features X 60 times = 13,140 features for 1,078 trials.
 
-Recall from our inspection of the raw data in [Figure Two](fig02) that the shape of the curves more than the value at any given timestep are what makes different bacterial species distinguishable.  Thus, I suspected that extracting features to describe the shapes of the curves would be the best features.
+Recall from our inspection of the raw data in [Figure Two](fig02) that the shape of the curves more than the value at any given timestep are what makes different bacterial species distinguishable.  Thus, I suspected that extracting features to describe the shapes of the curves would be the best features for any model.
 
-To incorporate time-correlation and extract a response curves shape, I curve fit the trace of each spot and each color (at each timestep) to two forms: n<sup>th</sup> order polynomials in time and sigmoidal in time.  That is, where DI<sub>i,j</sub> is the change in color of spot i over the set of timesteps {t<sub>0</sub>, t<sub>1</sub>,...,t<sub>}</sub>}, I fit:
+To incorporate time-correlation and extract a response curves shape, I curve fit the trace of each spot and each color (at each timestep) to two forms: n<sup>th</sup> order polynomials in time and sigmoidal in time.  That is, where DI<sub>i,j</sub> is the change in color of spot i over the set of timesteps {t<sub>0</sub>, t<sub>1</sub>,...,t<sub>}</sub>}, I fit the following two equations:
 
+##### <a name="e01"></a>Equation 1:
 + DI<sub>i,j</sub>(t) = b<sub>0</sub> + b<sub>1</sub>t + b<sub>2</sub>t<sup>2</sup> + ... + b<sub>p</sub>t<sup>p</sup>
 	+ polynomial.  p = 4 (in best performing models)
+
+##### <a name="e02"></a>Equation 2:
 + DI<sub>i,j</sub>(t) = 1/(A + exp(-kt + B))
 	+ sigmoidal
 
-Polynomial fitting was easily accompolished using sklearn PolynomialFeatures to generate t, t<sup>2</sup>, ... , t<sup>p</sup> and regressing with either OLS, LassoCV or RidgeCV.  OLS did a fine job of keeping consistent shape parameters at late t and was computationally much faster than the grid-searching, regularization methods, for which I didn't notice significant model performance.  I demonstrate some example curves below with raw data and their fourth order fits in [Figure Five](fig05).
+Polynomial fitting *([eqn 1](e01))* was easily accompolished using sklearn PolynomialFeatures to generate t, t<sup>2</sup>, ... , t<sup>p</sup> and regressing with either OLS, LassoCV or RidgeCV.  OLS did a fine job of keeping consistent shape parameters at late t and was computationally much faster than the grid-searching, regularization methods, for which I didn't notice significant model performance.  I demonstrate some example curves below with raw data and their fourth order fits in [Figure Five](fig05).
 
 #### <a name="fig05"></a> Figure Five
 *Examples of fourth order polynomimal fits for the change in color of a given spot in time, DI<sub>i,j</sub>(t).  The colored circles represent the raw data and the similarly colored line the fit.*
+
+
+![Figure Five - Example Polynomial Curve Fits](img/Poly.png)
+
+Considering the mechanism with which we observe color change from a gien spot, we might expect sigmoidal features *([eqn 2](e02))* to end up the strongest in a predictive model.  Chemical reaction kinetics as well as bacterial growth are known to show sigmoidal shapes, where the parameters in *([eqn 2](e02))* could represent: 
+
++ B: 
+	- bacterial growth kinetics: growth lag period
+	- reaction kinetics: concentration threshold for reaction of a given indicator or adsorption of given molecule onto the surface of the chemical sensor
++ A:
+	- bacterial growth kinetics: stationary phase maximum concentration
+	- reaction kinetics: saturation concentration for the indicator (reversible) or consumption of indicator (irreversible reactions)
++ k:
+	- bacterial growth kinetics: exponential phase rate of growth
+	- reaction kinetics: reaction rate constant and/or rate of reaction when the reactant is present in excess
+
+This connection to chemical and biological processes made me strongly believe coming into the projects that sigmoidal curve shape features would be, by far, the best features for improving model performance.  For a small number of timesteps, however, it is very challenging to approximate these parameters.  Consider, for example, a toy case in [Figure Six](#fig06) below.
+
+
+#### <a name="fig06"></a> Figure Six
+*Examples of sigomidal curve fits ([eqn 2](e02)) for the change in color of a given spot in time, DI<sub>i,j</sub>(t).  The grey circles represent toy data generated by adding noise to the sigmoid with parameters A=0.25, C=-3, k=1.25.  The green, blue, red, light blue, and purple lines represent best fit curves with 10, 12, 20, 30 and 40 timesteps fed in of 40 total timesteps.  The vertical dashed lines represent these time cut-offs*
+
+![Figure Six - Toy Example Sigmoidal Curve Fits](img/sigmoid.png)
+
+With a small number of timesteps fed in, using scipy's curve_fit function, a broad family of parameters will fit the data.  And since the cost function is not globally convex, the paramters chosen pick a sigmoid that plateaus at the maximum value yet perceived.  You can see in the legend that A, k and C are all poorly approximated for a small number of timesteps fed in.  Thus, despite its chemial and biological relevancy, sigmoidal curve shape parameters did not perform well when model tuning.
+
+### Model tuning and results
+
+Model tuning was particularly challenging for this product and remains an area where improvement can likely still be made.  Considering the desing of the cascading series model, I effectively created a neural network with inner layers reporting their probability.  I show this diagrammatically in Figure Seven.
+
 
 ## <a name="trigger"></a> Designing a Triggered, Series Model
 
