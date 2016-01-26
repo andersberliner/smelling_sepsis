@@ -17,17 +17,42 @@ import time
 import pickle
 
 def my_to_r(x, xname):
+    '''
+    Exports data as a gzip for use in R.
+
+    IN:
+        x - data - Data to be pickled.  Can be dictionary, numpy array, list, etc.
+        xname - str - Filename of compressed data.  NOTE - gzip is appended as an
+            extension.  File is named xname for use in R.
+    OUT: None
+    '''
     ro = numpy2ri.numpy2ri(x)
     r.assign(xname, ro)
     r_str = "save(%s, file='%s.gzip', compress=TRUE)" % (xname, xname)
     r(r_str)
 
 def my_pickle(x, xname):
+    '''
+    pickles the data in x to a file name xname
+
+    IN:
+        x - data - Data to be pickled.  Can be dictionary, numpy array, list, etc.
+        xname - str - Filename of pickled data
+    OUT: None
+    '''
     myfile = open(xname, 'wb')
     pickle.dump(x, myfile, -1)
     myfile.close()
 
 def my_unpickle(xname):
+    '''
+    Unpickles the data in file of name xname
+
+    IN:
+        xname - str - Filename of pickled data
+    OUT:
+        x - data - Unpickled data.  Can be dict, numpy array, list, etc.
+    '''
     myfile = open(xname, 'rb')
     x = pickle.load(myfile)
     myfile.close()
@@ -83,14 +108,32 @@ def export_to_r_and_pickle(X, y, used_column_headers, t):
     pandas2ri.deactivate()
 
 def timestamp_interpretter(x):
-    # TODO - fix regex for timestamps of the type:
-    #   2012-Apr-17_23-42-03
+    '''
+    Interprets timestamp containing string to return timestamp
+
+    IN:
+        x - str - timestamp containing string
+    OUT:
+        time_stamp - dt - datetime
+    '''
     # all image names are of the type:
     #   FrameName_YYYY-MM-DD_HH-MM-SS
     time_str_regex = r'.*_([0-9]{4}\-[0-9]{2}\-[0-9]{2}_[0-9]{2}\-[0-9]{2}\-[0-9]{2})'
+    r1 = re.findall(time_str_regex, x)
+    if r1:
+        time_str = r1[0]
+        time_stamp = datetime.datetime.strptime(time_str, '%Y-%m-%d_%H-%M-%S')
+    else:
+        # now assume timestamp of the form YYYY-Mon-DD_HH-MM-SS
+        time_str_regex = r'.*_([0-9]{4}\-[A-z]{3}\-[0-9]{2}_[0-9]{2}\-[0-9]{2}\-[0-9]{2})'
+        r2 = re.findall(time_str_regex, x)
+        if r2:
+            time_str = r2[0]
+            time_stamp = datetime.datetime.strptime(time_str, '%Y-%b-%d_%H-%M-%S')
+        else:
+            print 'Could not determine timestamp from filename'
 
-    time_str = re.findall(time_str_regex, x)[0]
-    time_stamp = datetime.datetime.strptime(time_str, '%Y-%m-%d_%H-%M-%S')
+
     # CONVERT TO MINUTES (or HOURS?) ELAPSED
     return time_stamp
 
