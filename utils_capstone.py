@@ -59,7 +59,9 @@ def my_unpickle(xname):
     return x
 
 def export_to_r_and_pickle(X, y, used_column_headers, t):
-
+    '''
+    Exports an object to r frame
+    '''
     pandas2ri.activate()
 
     my_pickle(X, 'X.pkl')

@@ -54,7 +54,35 @@ def main(RUNID='run001', START_DT_STR=None, MODELFILENAME='sm', PICKLE_DATA=Fals
     DO_TESTS=False, PROFILE=False, verbose=False, debug=False,
     RELOAD=False, n_cpus=1,
     PICKLE_NAMES=['Xdf.pkl', 'ydf.pkl', 'used_column_headers.pkl']):
-    # runs our job
+    '''
+    Runs our series model or triggered series model job based on the runtime
+    conditions and run parameters.
+
+    IN:
+        RUNID - str - str name for the folder where output will be stored and the
+            name of the json (without extension) containing run parameters
+            for seriesmodel or triggeredseriesmodel
+        START_DT_STR - str - timestamp as a string to append to the logfile.
+            Set in the header global params of capstone
+        MODELFILENAME - str - filename of model (for pickling)
+        PICKLE_DATA - bool - if the raw data should be pickled after loading into
+            a data frame
+        DO_TESTS - bool - if unittests should be run (True), or a job run (False)
+        PROFILE - bool - if memory profiling should be performed (True)
+        verbose - bool - when set to true, verbose output
+        debug - bool - whether a full dataset should be used (False), or a smaller
+            set of time points (True)
+        RELOAD - bool - whether data should be loaded from pickle (False), or
+            reloaded from raw data (True).  Set to true only for first run on a
+            new instance, then set to False for future runs to save load time.
+        n_cpus - int - number of cpus to use for multiprocessing jobs.
+        PICKLE_NAMES - list of str - list of the X (features) dataframe, y (labels)
+            data and spots_used file names.  When RELOAD is set to True, this is
+            the filenames where this data will be saved.  When RELOAD is set to
+            False, this is where the data will be loaded from.
+    OUT:
+        None
+    '''
 
     RUNID = command_line_process(RUNID)
     # prepare to run job
@@ -79,9 +107,11 @@ def main(RUNID='run001', START_DT_STR=None, MODELFILENAME='sm', PICKLE_DATA=Fals
         used_column_headers = my_unpickle(PICKLE_NAMES[2])
 
         end = time.time()
-        ptf( 'Data unpickled in %d seconds (%d total trials)' % ((end-start), len(X)), LOGFILE)
+        ptf( 'Data unpickled in %d seconds (%d total trials)' % ((end-start),
+            len(X)), LOGFILE)
 
-        tsm_unit = run_tsm_unittests(X, y, used_column_headers.values, verbose=verbose, logfile=LOGFILE)
+        tsm_unit = run_tsm_unittests(X, y, used_column_headers.values,
+            verbose=verbose, logfile=LOGFILE)
         # sm_unit = run_unittests(X_test, y_test, verbose=False)
     else:
         # ouptput run conditions to screen and logfile
@@ -160,7 +190,14 @@ def ascii_encode_dict(d):
     return {ascii_encode(k): ascii_encode(v) for k, v in d.iteritems()}
 
 def command_line_process(RUNID):
-    # do command-line processing to find RUNID
+    '''
+    Does command-line parsing to find RUNID
+
+    IN:
+        RUNID - str - default runid name
+    OUT:
+        RUNID - str - runid parsed from the command-line input
+    '''
     if len(argv) > 2:
         print 'ERROR - too many command-line arguments'
         print 'Usage capstone RUNID'
@@ -175,7 +212,15 @@ def command_line_process(RUNID):
     return RUNID
 
 def create_logfile(RUNID, LOGFILENAME):
-    # creates a directory to store this runs work and copies the run params there
+    '''
+    Creates a directory to store this runs' work and copies the run params there
+
+    IN:
+        RUNID - str - Name of the runid
+        LOGFILENAME - str - filename of the logfile for this run
+    OUT:
+        LOGFILE - fileobj - open file object of the logfile for this run
+    '''
     if not os.path.exists('./' + RUNID):
         os.makedirs('./' + RUNID)
     if LOGFILENAME:
@@ -189,7 +234,14 @@ def create_logfile(RUNID, LOGFILENAME):
     return LOGFILE
 
 def start_memory_profiling():
-    '''set-up some tracking statements from pympler'''
+    '''
+    Sets-up some tracking statements from pympler
+
+    IN: NONE
+    OUT:
+        tr - SummaryTracker - SummaryTracker object for the whole run
+        tr_sm - ClassTrackers - ClassTracker object of SeriesModel
+    '''
     tr = tracker.SummaryTracker()
     tr_sm = classtracker.ClassTracker()
     tr_sm.track_class(SeriesModel)
@@ -198,7 +250,16 @@ def start_memory_profiling():
     return tr, tr_sm
 
 def print_memory_profiles(sm, tr, tr_sm, LOGFILE = None):
-    '''prints report on memory profiles'''
+    '''
+    Prints report on memory profiles
+
+    IN:
+        sm - SeriesModel - SeriesModel object for this run
+        tr - SummaryTracker - SummaryTracker object for the whole run
+        tr_sm - ClassTrackers - ClassTracker object of SeriesModel
+        LOGFILE - file obj - Open logfile for print output
+    OUT: None
+    '''
     ptf( '\nSERIESMODEL profiling', LOGFILE)
     ptf( 'Look at size of seriesmodel object', LOGFILE)
     ptf( asizeof.asizeof(sm), LOGFILE)
@@ -221,8 +282,19 @@ def reload_data(LOGFILE = None, PICKLE_DATA = True,
     IN:
         LOGFILE -  fileobj - an open text file where logs are written
         PICKLE_DATA - bool - whether to pickle data once loaded
-        root_folder - str - relative path to top level folder for all data and csv_file
-        csv_filename - str - name of csv file containing the trial labels and locations
+        root_folder - str - relative path to top level folder for all data and
+            csv_file
+        csv_filename - str - name of csv file containing the trial labels and
+            locations
+    OUT:
+        X - pd Series - Series of features.  Each row is a trial (index) and a
+            number of features + 1 X number of times numpy array (data)
+        y - pd DataFrame - labels data frame.  Each row is a trial (index) and
+            the labels of each class the columns
+        used_column_headers - list of str -
+        df - pd DataFrame - DataFrame containing all trial data after elmination
+            of extraneous spots, trials
+        df_raw - pd DataFrame - DataFrame containing all trial data (before pruning)
     '''
     csv_file = os.path.join(root_folder, csv_filename)
 
@@ -243,8 +315,30 @@ def reload_data(LOGFILE = None, PICKLE_DATA = True,
 
 def print_job_info(run_params, n_jobs, n_cpus, RUNID, START_DT_STR, LOGFILE = None,
     debug = False, profile=False, verbose = True, start = True):
-    # Outputs header, footer describing job conditions
+    '''
+    Outputs header, footer describing job conditions
 
+    IN:
+        run_params - dict - Dictionary from the runparameters json describing.
+            Contains the initializiation conditions for the seriesmodel of this
+            run.
+        n_jobs - int - number of jobs to be used by parallelizable solvers in
+            seriesmodel
+        n_cpus - int - number of cpus available on this machine
+        RUNID - str - str name for the folder where output will be stored and the
+            name of the json (without extension) containing run parameters
+            for seriesmodel or triggeredseriesmodel
+        START_DT_STR - str - timestamp as a string to append to the logfile.  Set
+            in the header global params of capstone
+        debug - bool - whether a full dataset should be used (False), or a smaller
+            set of time points (True).  Condition for main/seriesmodel.
+        profile - bool - if memory profiling should be performed (True)
+        verbose - bool - when set to true, verbose output. Condition for
+            main/seriesmodel.
+        start - bool - whether this is the header (True) or footer (False) of
+            the run output
+    OUT: None
+    '''
     if start:
         ptf('====> Starting job ID: %s_%s <====' % (RUNID, START_DT_STR), LOGFILE)
     else:
@@ -257,7 +351,15 @@ def print_job_info(run_params, n_jobs, n_cpus, RUNID, START_DT_STR, LOGFILE = No
         ptf('\t%s: %s' % (k,v), LOGFILE)
 
 def print_run_details(X, sm, LOGFILE=None):
-    # prints other run details
+    '''
+    prints other run details
+
+    IN:
+        X - pd DataSeries - Raw feature data (used to report the number of trials)
+        sm - SeriesModel - SeriesModel or TriggeredSeriesModel for this run
+        LOGFILE - fild obj - open logfile for outputting print statements
+    OUT: None
+    '''
     ptf('\n\n>> Run details <<')
     ptf('\tntrials: %d' % len(X), LOGFILE)
     ptf('\tntimes: %d' % len(sm.times), LOGFILE)
@@ -265,7 +367,15 @@ def print_run_details(X, sm, LOGFILE=None):
     ptf(sm, LOGFILE)
 
 def save_model(sm, RUNID, MODELFILENAME, LOGFILE=None):
-    # saves model to file
+    '''
+    Saves model to file
+
+    IN:
+        sm - SeriesModel - SeriesModel or TriggeredSeriesModel for this run
+        RUNID - str - str name for the folder where file will be saved
+        MODELFILENAME - str - filename SeriesModel will be saved to
+        LOGFILE - fild obj - open logfile for outputting print statements
+    '''
     model_file = open('./' + RUNID + '/' + MODELFILENAME, 'wb')
     ptf('\n>> Writing model results to %s' % MODELFILENAME, LOGFILE)
     pickle.dump(sm, model_file, -1)
