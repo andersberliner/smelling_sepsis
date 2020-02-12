@@ -1,5 +1,6 @@
 # Smelling Sepsis
-=================
+-----------------
+ 
 A cascading, series model to quickly and accurately predict the first three steps in sepsis diagnosis utilizing electronic nose sensor data from [Specific technologies](http://specifictechnologies.net/).
 
 ## i. Contents
@@ -29,9 +30,9 @@ Treatment of sepsis is all about speed: fast action is the key to survival.  But
 
 + 8 hours to 4 days (to confirm negative)
 
-First, a doctor needs to confirm that you have an infection.  They perform a **blood culture** by taking a small sample of your blood (typically 10 mL) and injecting it into a bottle  of growth media designed to provide the optimal environment for bacteria, if present, to flourish and grow (i.e they **innoculate** a *"blood culture"* or *"growth media"* bottle).  The innoculated blood culture bottles is then placed inside a **blood culture instrument** which tracks the presence of carbon dioxide expired by bacteria as they grow.  If bacteria are present, they will rapidly multiply, produce a large amount of carbon dioxide, and the blood culture instrument flags the sample as **postitive**.
+First, a doctor needs to confirm that you have an infection.  They perform a **blood culture** by taking a small sample of your blood (typically 10 mL) and injecting it into a bottle  of growth media designed to provide the optimal environment for bacteria, if present, to flourish and grow (i.e they **inoculate** a *"blood culture"* or *"growth media"* bottle).  The inoculated blood culture bottle is then placed inside a **blood culture instrument** which tracks the presence of carbon dioxide expired by bacteria as they grow.  If bacteria are present, they will rapidly multiply, produce a large amount of carbon dioxide, and the blood culture instrument flags the sample as **postitive**.
 
-With the results in hand, and note that a big time lag can occur waiting for the lab to re-open the next morning, e.g., your diagnosis continues with the proceeding steps.  At this stage a doctor may start you on a course of **broad-spectrum antibiotics**, drugs designed to combat many common types of bacteria (e.g. methicillin).  But this is performed with significant hesitation: broad spectrum antibiotics kill a large number of helpful bacteria that live in and on you, and *septic* patients (patients displaying the symptoms of a blood stream infection) already have weakened immune systems by fighting their infection.  Additionally, and with increasing importance, the spread of **antibiotic-resistant strains** of bacteria *(e.g. [Methicillin-resistant Staphylococcus aureus, or MRSA](http://www.cdc.gov/mrsa/))* have caused the medical community to carefully consider when to use certain drugs.  Your doctor would much prefer to know exactly what is causing your infection and precisely the best, most specific drug to treat it, but they need more information.
+With the results in hand, and note that a big time lag can occur waiting for the lab to re-open the next morning, e.g., your diagnosis continues with the following steps.  At this stage a doctor may start you on a course of **broad-spectrum antibiotics**, drugs designed to combat many common types of bacteria (e.g. methicillin).  But this is performed with significant hesitation: broad spectrum antibiotics kill a large number of helpful bacteria that live in and on you, and *septic* patients (patients displaying the symptoms of a blood stream infection) already have weakened immune systems by fighting their infection.  Additionally, and with increasing importance, the spread of **antibiotic-resistant strains** of bacteria *(e.g. [Methicillin-resistant Staphylococcus aureus, or MRSA](http://www.cdc.gov/mrsa/))* have caused the medical community to carefully consider when to use certain drugs.  Your doctor would much prefer to know exactly what is causing your infection and precisely the best, most specific drug to treat it, but they need more information.
 
 #### 2. Gram - What family of bacteria is making me sick?
 
@@ -39,14 +40,14 @@ With the results in hand, and note that a big time lag can occur waiting for the
 
 Second, a doctor wants to narrow down the cause of your infection.  A [gram stain](https://en.wikipedia.org/wiki/Gram_staining) will classify bacteria as either **gram positive** *(e.g. [Staphylococcus aureus](http://www.cdc.gov/HAI/organisms/staph.html), or "staph")* or **gram negative** *(e.g. [Escherichia coli](http://www.cdc.gov/ecoli/), or "E.coli")* depending on the characteristics of their cellular membranes. A technician takes a sample of the bacteria grown in the blood culture bottle during the detection step and performs a simple benchtop test.  This result informs which type of tests to run in the next two steps of diagnosis.
 
-Gram stains are routine tests for a microbiology lab tech, but require a tech to do the work and to start the next steps.  Many hospitals are moving to centralized labs (i.e. a remote facility that runs all four of these diagnostic steps for many hopsitals in the region), which adds sample transport and results reporting delays.
+Gram stains are routine tests for a microbiology lab tech, but require a tech to do the work and to start the next steps.  Many hospitals are moving to centralized labs (i.e. a remote facility that runs all four of these diagnostic steps for many hopsitals in the region), which adds sample transport and results in reporting delays.
 
 
 #### 3. Identification -  What specific type of bacteria is making me sick?
 
 + Several hours to up to several days
 
-Third, a doctor will want to know exactly what is causing your infection by determing the bacterial **species**.  The microbiology diagnostic community is a buzz with [emerging techniques](http://www.mayomedicallaboratories.com/articles/hottopics/2012/02-bact-id/index.html) to speed-up and automate this step *(at least for well-funded hospitals)*, but traditionally this is performed by, again, sampling from the bacteria grown in the blood culture bottle in step one and placing it on a petri dish (i.e. **plating** or **re-culturing** the bacteria).  The bacteria is re-grown and inspected under a microscope by a trained microbiologist who knows what they are looking at and can determine what it is with the help of other assays that vary depending on what they see.
+Third, a doctor will want to know exactly what is causing your infection by determing the bacterial **species**.  The microbiology diagnostic community is abuzz with [emerging techniques](http://www.mayomedicallaboratories.com/articles/hottopics/2012/02-bact-id/index.html) to speed-up and automate this step *(at least for well-funded hospitals)*, but traditionally this is performed by, again, sampling from the bacteria grown in the blood culture bottle in step one and placing it on a petri dish (i.e. **plating** or **re-culturing** the bacteria).  The bacteria is re-grown and inspected under a microscope by a trained microbiologist who knows what they are looking at and can determine what it is with the help of other assays that vary depending on what they see.
 
 With the **species ID** in hand, your doctor is ready to determine what **strain** of bacteria you have, where a strain is a variant of a given bacterial species characterized primarily by which drugs are effective or not effective in treating it, as discussed in the last step.  Despite the advances linked to above, this step is also subject to time lag by technician availability or a lab facility being open or closed.
 
@@ -54,33 +55,31 @@ With the **species ID** in hand, your doctor is ready to determine what **strain
 
 + Up to one day
 
-Fourth, your doctor wants to know what drugs are effective and what **dosage** is appropriate.  Using samples of the bacteria grown in the third step, lab technicians will try combinations of drugs and doses of those drugs and observe if cell death occurs in the microliter sized wells of *micro-titer plates* (i.e. a miniturized testtube rack).  They are hoping to find a **narrow spectrum antibiotic**, a drug that primarily kills only the infectious bacteria and does minimal harm to the "good" bacteria in your body, and know the "goldilocks" amount of that drug to administer.
+Fourth, your doctor wants to know what drugs are effective and what **dosage** is appropriate.  Using samples of the bacteria grown in the third step, lab technicians will try combinations of drugs and doses of those drugs and observe if cell death occurs in the microliter sized wells of *micro-titer plates* (i.e. a miniturized testtube rack).  They are hoping to find a **narrow spectrum antibiotic**, a drug that primarily kills only the infectious bacteria and does minimal harm to the "good" bacteria in your body, and determine the "goldilocks" amount of that drug to administer.
 
-With the susceptibility test results in hand, your doctor prescribes the appropriate drug and, hopefully, it can be administered in time to fight of the infection invading your body.  But in many cases, this process simply takes too long.
+With the susceptibility test results in hand, your doctor prescribes the appropriate drug and, hopefully, it can be administered in time to fight off the infection invading your body.  But in many cases, this process simply takes too long.
 
 ## <a name="csa"></a> How do we smell sepsis?
 
-[Specific technologies](specifictechnologies.net) is a Mountain View start-up applying electronic nose technology to medical diagnostics.  Their technology is cheap and appropriate for low-resource conditions (like developing countries).  It revolves around detecting the color changes of an array of colorimetric indicators (think many flavors of [litmus paper](https://en.wikipedia.org/wiki/PH_indicator), so tailored to change color to a wide variety of chemical compounds beyond just changes in pH).  These so called **[Colorimetric Sensor Arrays](http://www.scs.illinois.edu/suslick/smell_seeing.html)**, or **CSAs**, were invented by Prof. Ken Suslick at the University of Illinois.  An example colorimetric sensor array is presented in [Figure One, box A](fig01) *(reproduced from [Lim et. al., J. Clin. Microbiol., 2014, 52 vol 2](http://jcm.asm.org/content/52/2/592.short
-))*.
+[Specific technologies](specifictechnologies.net) is a Mountain View start-up applying electronic nose technology to medical diagnostics.  Their technology is cheap and appropriate for low-resource conditions (like developing countries).  It revolves around detecting the color changes of an array of colorimetric indicators (think many flavors of [litmus paper](https://en.wikipedia.org/wiki/PH_indicator), so indicators tailored to change color when presented a wide variety of chemical compounds beyond just changes in pH).  These so called **[Colorimetric Sensor Arrays](http://www.scs.illinois.edu/suslick/smell_seeing.html)**, or **CSAs**, were invented by Prof. Ken Suslick at the University of Illinois.  An example colorimetric sensor array is presented in [Figure One, box A](fig01) *(reproduced from [Lim et. al., J. Clin. Microbiol., 2014, 52 vol 2](http://jcm.asm.org/content/52/2/592.short))*.
 
 #### <a name="fig01"></a> Figure One - Specific Technologies uses CSAs to diagnosis sepsis.
-*A colorimetric sensor array, (a), is placed on-top of a blood culture bottle, (c), and "smells" the headspace volatile organic compounds of bacteria as they grow via an opening or semi-permeable membrane in the bottle cap, (b).  Tests were performed at Stanford University in standard lab incubators using a lab shaker and custom rack, (d), where the CSAs where image through the cap by a flatbed scanner.*
+*A colorimetric sensor array, (a), is placed on-top of a blood culture bottle, (c), and "smells" the headspace volatile organic compounds of bacteria as they grow via an opening or semi-permeable membrane in the bottle cap, (b).  Tests were performed at Stanford University in standard lab incubators using a lab shaker and custom rack, (d), where the CSAs where imaged through the cap by a flatbed scanner.*
 
 ![figure one - specific technologies](img/st.png)
 
-Each colored spot is a different color-changing **indicator** that responds to different sets of chemical compounds it interacts with, or "smells" (i.e. each spot is a chemical sensor).  Like mamalian-noses, each spot is not specifically responsive to one thing; the combination of their responses, rather, distinguishes the **volatile organic compounds**, or **VOCs**, the sensor array is "smelling".  Given the high dimensionality of these arrays, CSAs can distinguish thousands of different VOCs, and do so at low concentrations *(see, for example, [Feng et. al., Chem. Commun., 2010, 46, 2037-2039](http://www.scs.illinois.edu/suslick/documents/chemcomm.20102037.pdf).)* Furthermore, the high-dimensionality of these arrays allows for a "smell fingerprint" of cocktails of VOCs (i.e. complex mixtures of chemical compounds) which can be used to identify different things, including the different sets of respiration products of different species of bacteria (i.e. the different things different bacteria exhale as they grow).
+Each colored spot is a different color-changing **indicator** that responds to different sets of chemical compounds it interacts with, or "smells" (i.e. each spot is a chemical sensor).  Like mamalian noses, each spot is not specifically responsive to one thing; the combination of their responses, rather, distinguishes the **volatile organic compounds**, or **VOCs**, the sensor array is "smelling".  Given the high dimensionality of these arrays, CSAs can distinguish thousands of different VOCs, and do so at low concentrations *(see, for example, [Feng et. al., Chem. Commun., 2010, 46, 2037-2039](http://www.scs.illinois.edu/suslick/documents/chemcomm.20102037.pdf).)* Furthermore, the high-dimensionality of these arrays allows for a "smell fingerprint" of cocktails of VOCs (i.e. complex mixtures of chemical compounds) which can be used to identify different things, including the different sets of respiration products of different species of bacteria (i.e. the different things different bacteria exhale as they grow).
 
-Specific Technologies is using CSAs to combine the first three steps of sepsis diagnosis, (detection, gram and identification), into one automated step, and signficantly speeding up the diagnositic timeline in the process.  The CSA, shown in [Figure One a](fig01), is incorporated into a plastic cap that fits over a standard blood culture bottle, as shown in box c.  The caps are transparent so that they can be imaged, e.g. by a flatbed scanner, and the color of each spot can be tracked over time.  As bacteria grow, respiration VOCs accumulate in the headspace of the bottle (i.e. the gas above the liquid), and the CSA "smells" these volatiles by their passive diffusion through an opening in the lid or through a permeable membrane, as shown in b.  By imaging the CSAs at regular intervals and tracking the change of color of each spot (i.e. the red, green and blue components) over time, the response curves provide distinguishing signals for different species of bacteria.  Some example data for four classes of bacteria and individual color channels of 3 indicators are shown in [Figure Two](fig02) below (*(reproduced from [Lim et. al., J. Clin. Microbiol., 2014, 52 vol 2](http://jcm.asm.org/content/52/2/592.short
-)).*
+Specific Technologies is using CSAs to combine the first three steps of sepsis diagnosis, (detection, gram and identification), into one automated step, and signficantly speeding up the diagnositic timeline in the process.  The CSA, shown in [Figure One a](fig01), is incorporated into a plastic cap that fits over a standard blood culture bottle, as shown in box c.  The caps are transparent so that they can be imaged, e.g. by a flatbed scanner, and the color of each spot can be tracked over time.  As bacteria grow, respiration VOCs accumulate in the headspace of the bottle (i.e. the gas above the liquid), and the CSA "smells" these volatiles by their passive diffusion through an opening in the lid or through a permeable membrane, as shown in b.  By imaging the CSAs at regular intervals and tracking the change of color of each spot (i.e. the red, green and blue components) over time, the response curves provide distinguishing signals for different species of bacteria.  Some example data for four classes of bacteria and individual color channels of 3 indicators are shown in [Figure Two](fig02) below (*(reproduced from [Lim et. al., J. Clin. Microbiol., 2014, 52 vol 2](http://jcm.asm.org/content/52/2/592.short)).*
 
 #### <a name="fig02"></a> Figure Two - Example Response Data
-*Example color difference image, (a), and time series (b) for 4 bacterial species and three indicators. The difference maps are the average (after - before) for each class at the time of indentification mapped onto the same grid as the physical arrays (Figure One a).  The values are shown via the spots color. The time series represent how one color channel (red, green or blue) for one indicator (one of the colored spots) have changed color over time (in hours since inncoulation), grouped by class.  They are shows as percent change in spot color (I(t)-I(0))/I(0), where I(t) is the median pixel intensity for a color channel (R,G,B) at time t.  The grouped responses of all of the indicators allows for classification.*
+*Example color difference image, (a), and time series (b) for 4 bacterial species and three indicators. The difference maps are the average (after - before) for each class at the time of indentification mapped onto the same grid as the physical arrays (Figure One a).  The values are shown via the spots' color. The time series represent how one color channel (red, green or blue) for one indicator (one of the colored spots) have changed color over time (in hours since inoculation), grouped by class.  They are shown as percent change in spot color (I(t)-I(0))/I(0), where I(t) is the median pixel intensity for a color channel (R,G,B) at time t.  The grouped responses of all of the indicators allows for classification.*
 
-![figure one - specific technologies](img/data.png)
+![figure two - specific technologies](img/data.png)
 
-In the experiments performed in [Lim et. al., J. Clin. Microbiol., 2014, 52 vol 2](http://jcm.asm.org/content/52/2/592.short), Specific Technologies and Dr. Niaz Banaei at Stanford University spiked blood culture bottles with known amounts of bacteria and pathogen free blood and tracked the response of CSAs as they sampled the bottles headspace.  For 1078 trials including 17 species of bacteria plus uninnoculated controls, they observed distinguishing resopnses such as those shown in [Figure Two](fig02).  In a), the color difference maps show the overall pattern of color change of bacteria at a given time.  The difference maps are the average (after - before) for each class at the time of indentification mapped onto the same grid as the physical arrays (Figure One a).  The values are shown via the spots color.
+In the experiments performed in [Lim et. al., J. Clin. Microbiol., 2014, 52 vol 2](http://jcm.asm.org/content/52/2/592.short), Specific Technologies and Dr. Niaz Banaei at Stanford University spiked blood culture bottles with known amounts of bacteria and pathogen free blood and tracked the response of CSAs as they sampled the bottles' headspace.  For 1078 trials including 17 species of bacteria plus uninoculated controls, they observed distinguishing responses such as those shown in [Figure Two](fig02).  In a), the color difference maps show the overall pattern of color change of bacteria at a given time.  The difference maps are the average (after - before) for each class at the time of indentification mapped onto the same grid as the physical arrays (Figure One a).  The values are shown via the spots color.
 
-More interestingly, in b) time series responses of a few channels and bacteria are shown.  Each box in b) is a the percent change in color for one color channel (red, green or blue), where each line represents a single trial for a bacteria of that species.  Thus, one green line in row 1 column 1, one blue line in row 2, column 1 and one red line in row 3, column 1 would correspond to one "observation" *(see [data](#data) for more details)*.  The combination of the curve shapes for these different indicators provides the basis for: 
+More interestingly, in b) time series responses of a few channels and bacteria are shown.  Each box in b) is the percent change in color for one color channel (red, green or blue), where each line represents a single trial for a bacteria of that species.  Thus, one green line in row 1 column 1, one blue line in row 2, column 1 and one red line in row 3, column 1 would correspond to one "observation" *(see [data](#data) for more details)*.  The combination of the curve shapes for these different indicators provides the basis for: 
 
 1. **Detection** 
 
@@ -92,19 +91,19 @@ More interestingly, in b) time series responses of a few channels and bacteria a
 	
 3. **Identification**
 
-	- Notice, e.g., that E.coli and K.pneumoniae both show changes in the bottom 2 rows, but K.pneumoniae does not shwo changes in row 1.  This means the K.pneumoniae does not produce volatiles that interact with Spot 1, although E.coli does.
+	- Notice, e.g., that E.coli and K.pneumoniae both show changes in the bottom 2 rows, but K.pneumoniae does not show changes in row 1.  This means that K.pneumoniae does not produce volatiles that interact with Spot 1, although E.coli does.
 
-Thus, the Specific Technologies paradigm can provide for the first 3 steps of sepsis diagnosis in a single step.  Since no intervention by a lab technician is required, and because the CSA is, itself, sensitive enough to probe the difference in bacteria, you can determine the species identification at the same time or 1-2 hours after you know that a patient is infected, saving hours to days in the diagnosis timeline.  This is enormously impactful, and the promising results Specific Technologies has already achieved as they continue to commercialize this product mean the potential to save millions of lives.
+Thus, the Specific Technologies paradigm can provide for the first 3 steps of sepsis diagnosis in a single step.  Since no intervention by a lab technician is required, and because the CSA is, itself, sensitive enough to probe the differences in varying bacterial species, you can determine the species identification at the same time or 1-2 hours after you know that a patient is infected, saving hours to days in the diagnosis timeline.  This is enormously impactful, and the promising results Specific Technologies have already achieved as they continue to commercialize this product means the potential to save millions of lives.
 
 Graciously, Specific Technologies provided me the raw data from their publication which I used to try out new approaches to their multi-class classification problem.
 
 ### Project Definition
 
-My capstone project was to use machine learning technique to see how quickly and how accurately I could diagnose sepsis.
+My capstone project was to use machine learning techniques to see how quickly and how accurately I could diagnose sepsis.
 
 ## <a name="cascadeseries"></a> Designing a Cascading, Series Model
 
-To build a model that will function appropriately on-board a piece of diagnostic equiment, it needs to provide the answers to all three of detection, gram, indentification questions as well as handle incoming data the same way it would be received in real time.  To do this, I built a custom a **cascading, series model**, which I explain below.
+To build a model that will function appropriately on-board a piece of diagnostic equiment, it needs to provide the answers to all three of the detection, gram, indentification questions as well as handle incoming data the same way it would be received in real time.  To do this, I built a custom a **cascading, series model**, which I explain below.
 
 ### Cascading
 
@@ -126,7 +125,7 @@ Although I haven't implemented these options yet (it's a relatively straightforw
 
 It's a series of models because it needs to answer the question of how quicly can you diagnose my sepsis, not just how accutately.  Consider again [Figure Two](fig02), where the data extends to 18 hours.  Could you make the same predicitions about species if you only had, for example, half of the data (up to 9 hours)?  What about at 12 hours?  Since my objective is to not just accurately, but also quickly diagnose sepsis, early time model performance is extremely important.  Class difference at early times are much more subtle than at later times, so you would expect a model trained with 18 hours of data to perform poorly on only 6 hours of data, and vice versa (not to mention that, unless you are smart in your feature extraction, they are likely to require different numbers of features).
 
-To allow for course correction or increasing confidence of one diagnosis or the next, the models should inform each other.  I like to think of the "did I miss my turn" example when you're trying to get some place you haven't been to before.  Shortly after missing your turn, you might not be particularly confident one way or the other.  But as time continues and you continue to see unexpected landmarks, you would become more concerned.  It's not a memory-less process: each individual unexpected steet sign might not, on its own, convince you that your lost,  but their repeated observation is what makes you turn around.
+To allow for course correction or increasing confidence of one diagnosis or the next, the models should inform each other.  I like to think of the "did I miss my turn" example when you're trying to get some place you haven't been to before.  Shortly after missing your turn, you might not be particularly confident one way or the other.  But as time continues and you continue to see unexpected landmarks, you would become more concerned.  It's not a memory-less process: each individual unexpected steet sign might not, on its own, convince you that you're lost,  but their repeated observation is what makes you turn around.
 
 To accomplish this, I built a series of cascading models where the probabilities at the previous timestep are fed as additional features to the current timestep, shown diagrammatically in [Figure Four](fig04).
 
@@ -147,13 +146,13 @@ The big difference between linear or logistic regression in longitudinal analysi
 
 In longitudinal analysis, the individual data points are necessarily not independent.  In our cholesterol drug, LDL/HDL example, if someone started with higher baseline cholesterol levels, you expect the next measure of their cholesterol to be somewhat close to the first measure.  This, effectively, means your data's distribution around any best fit line should be "tighter" than in the usual regression case.  Depending upon the level of correlation between repeated measures, the covariance can have many non-zero terms.  Regression is the fitting of a multivariate normal distribution where all the terms in the covariance matrix must be computed.
 
-I'm not aware of any python packages for generalized linear mixed effects *("generalized linear" since its logistic regression, "mixed effects" because of the mixed effects of repeated obervations from a single trial)*.  R has at least a couple of implementations: lme4 with glmr and mcmcglm.  I tried to use both of these with this project (and experimented with the rpy2 wrapper to access them through python), but unforunately they can't handle data of my type.  
+I'm not aware of any python packages for generalized linear mixed effects *("generalized linear" since its logistic regression, "mixed effects" because of the mixed effects of repeated obervations from a single trial)*.  R has at least a couple of implementations: `lme4` with `glmr` and `mcmcglm`.  I tried to use both of these with this project (and experimented with the `rpy2` wrapper to access them through python), but unforunately they can't handle data of my type.  
 
-In mcmcglm, the structure of the covariance matrix can't be specified.  This matters because our 219 features (each of which is repeatedly observed 60-145 times), are necessarily correlated beyond just the each feature is correlated with itself in time.  Recall that the 219 features came from 73 spots broken into 3 color channels each.  Thus the color channels from a given spot are correlated *(another idea for future work is experimenting with different color scale transformations to more appropriately incorporate this into my models)*.  Additionally, many of the spots respond to the same chemical compounds.  As a toy example, presume both spot 5 and spot 6 respond to carbon dioxide.  Although they won't respond identically, once bacteria start to produce carbon dioxide in significant amounts, there responses will be correlated.
+In `mcmcglm`, the structure of the covariance matrix can't be specified.  This matters because our 219 features (each of which is repeatedly observed 60-145 times), are necessarily correlated beyond just the fact that each feature is correlated with itself in time.  Recall that the 219 features came from 73 spots broken into 3 color channels each.  Thus the color channels from a given spot are correlated *(another idea for future work is experimenting with different color scale transformations to more appropriately incorporate this into my models)*.  Additionally, many of the spots respond to the same chemical compounds.  As a toy example, presume both spot 5 and spot 6 respond to carbon dioxide.  Although they won't respond identically, once bacteria start to produce carbon dioxide in significant amounts, there responses will be correlated.
 
-lme4 allows for specifying the structure of the covariance matrix.  But I could not get it to converge for data of this size (see [data](#data) for more details).  In fact, even with very small subsets of the data, resulting in only 10,000 or so terms to estimate in the covariance matrix, I could not get this solution to converge.
+`lme4` allows for specifying the structure of the covariance matrix.  But I could not get it to converge for data of this size (see [data](#data) for more details).  In fact, even with very small subsets of the data, resulting in only 10,000 or so terms to estimate in the covariance matrix, I could not get this solution to converge.
 
-Fitzmaurice, Laird and Ware in their excellent [Applied Longitudinal Analysis, 2nd edition](http://www.hsph.harvard.edu/fitzmaur/ala2e/), provide sample datasets and sample R code for the use of lme4 and glmer to solve generalized linear mixed effects models.  You can view the sample code [here](http://www.hsph.harvard.edu/fitzmaur/ala2e/R_sect_16_5.html) (look at the second example), and download the data in text format [here](http://www.hsph.harvard.edu/fitzmaur/ala2e/ecg-data.txt) (and read about the source of the data [here](http://www.hsph.harvard.edu/fitzmaur/ala2e/ecg.txt)).  The solvers happily converge for data of this size (about 100 rows).
+Fitzmaurice, Laird and Ware in their excellent [Applied Longitudinal Analysis, 2nd edition](http://www.hsph.harvard.edu/fitzmaur/ala2e/), provide sample datasets and sample R code for the use of `lme4` and `glmer` to solve generalized linear mixed effects models.  You can view the sample code [here](http://www.hsph.harvard.edu/fitzmaur/ala2e/R_sect_16_5.html) (look at the second example), and download the data in text format [here](http://www.hsph.harvard.edu/fitzmaur/ala2e/ecg-data.txt) (and read about the source of the data [here](http://www.hsph.harvard.edu/fitzmaur/ala2e/ecg.txt)).  The solvers happily converge for data of this size (about 100 rows).
 
 ### Feature Extraction via Curve Shape Parameters
 
@@ -161,7 +160,7 @@ Since traditional longitudinal analysis would not work for my dataset, I needed 
 
 Recall from our inspection of the raw data in [Figure Two](#fig02) that the shape of the curves more than the value at any given timestep are what makes different bacterial species distinguishable.  Thus, I suspected that extracting features to describe the shapes of the curves would be the best features for any model.
 
-To incorporate time-correlation and extract a response curves shape, I curve fit the trace of each spot and each color (at each timestep) to two forms: n<sup>th</sup> order polynomials in time and sigmoidal in time.  That is, where DI<sub>i,j</sub> is the change in color of spot i over the set of timesteps {t<sub>0</sub>, t<sub>1</sub>,...,t<sub>}</sub>}, I fit the following two equations:
+To incorporate time-correlation and extract a response curve's shape, I fit the trace of each spot and each color (at each timestep) to two forms: n<sup>th</sup> order polynomials in time and sigmoidals in time.  That is, where DI<sub>i,j</sub> is the change in color of spot i over the set of timesteps {t<sub>0</sub>, t<sub>1</sub>,...,t<sub>}</sub>}, I fit the following two equations:
 
 ##### <a name="e01"></a>Equation 1:
 + DI<sub>i,j</sub>(t) = b<sub>0</sub> + b<sub>1</sub>t + b<sub>2</sub>t<sup>2</sup> + ... + b<sub>p</sub>t<sup>p</sup>
@@ -171,7 +170,7 @@ To incorporate time-correlation and extract a response curves shape, I curve fit
 + DI<sub>i,j</sub>(t) = 1/(A + exp(-kt + B))
 	+ sigmoidal
 
-Polynomial fitting *([eqn 1](#e01))* was easily accompolished using sklearn PolynomialFeatures to generate t, t<sup>2</sup>, ... , t<sup>p</sup> and regressing with either OLS, LassoCV or RidgeCV.  OLS did a fine job of keeping consistent shape parameters at late t and was computationally much faster than the grid-searching, regularization methods, for which I didn't notice significant model performance.  I demonstrate some example curves below with raw data and their fourth order fits in [Figure Five](#fig05).
+Polynomial fitting *([eqn 1](#e01))* was easily accompolished using `sklearn` PolynomialFeatures to generate t, t<sup>2</sup>, ... , t<sup>p</sup> and regressing with either OLS, LassoCV or RidgeCV.  OLS did a fine job of keeping consistent shape parameters at late t and was computationally much faster than the grid-searching, regularization methods, for which I didn't notice significant model performance.  I demonstrate some example curves below with raw data and their fourth order fits in [Figure Five](#fig05).
 
 #### <a name="fig05"></a> Figure Five
 *Examples of fourth order polynomimal fits for the change in color of a given spot in time, DI<sub>i,j</sub>(t).  The colored circles represent the raw data and the similarly colored line the fit.*
@@ -179,7 +178,7 @@ Polynomial fitting *([eqn 1](#e01))* was easily accompolished using sklearn Poly
 
 ![Figure Five - Example Polynomial Curve Fits](img/Poly.png)
 
-Considering the mechanism with which we observe color change from a gien spot, we might expect sigmoidal features *([eqn 2](#e02))* to end up the strongest in a predictive model.  Chemical reaction kinetics as well as bacterial growth are known to show sigmoidal shapes, where the parameters in *([eqn 2](#e02))* could represent: 
+Considering the mechanism with which we observe color change from a given spot, we might expect sigmoidal features *([eqn 2](#e02))* to end up the strongest in a predictive model.  Chemical reaction kinetics as well as bacterial growth are known to show sigmoidal shapes, where the parameters in *([eqn 2](#e02))* could represent: 
 
 + B: 
 	- bacterial growth kinetics: growth lag period
@@ -191,7 +190,7 @@ Considering the mechanism with which we observe color change from a gien spot, w
 	- bacterial growth kinetics: exponential phase rate of growth
 	- reaction kinetics: reaction rate constant and/or rate of reaction when the reactant is present in excess
 
-This connection to chemical and biological processes made me strongly believe coming into the projects that sigmoidal curve shape features would be, by far, the best features for improving model performance.  For a small number of timesteps, however, it is very challenging to approximate these parameters.  Consider, for example, a toy case in [Figure Six](#fig06) below.
+This connection to chemical and biological processes made me strongly believe coming into the project that sigmoidal curve shape features would be, by far, the best features for improving model performance.  For a small number of timesteps, however, it is very challenging to approximate these parameters.  Consider, for example, a toy case in [Figure Six](#fig06) below.
 
 
 #### <a name="fig06"></a> Figure Six
@@ -199,7 +198,7 @@ This connection to chemical and biological processes made me strongly believe co
 
 ![Figure Six - Toy Example Sigmoidal Curve Fits](img/sigmoid.png)
 
-With a small number of timesteps fed in, using scipy's curve_fit function, a broad family of parameters will fit the data.  And since the cost function is not globally convex, the paramters chosen pick a sigmoid that plateaus at the maximum value yet perceived.  You can see in the legend that A, k and C are all poorly approximated for a small number of timesteps fed in.  Thus, despite its chemial and biological relevancy, sigmoidal curve shape parameters did not perform well when model tuning.
+With a small number of timesteps fed in, using scipy's `curve_fit` function, a broad family of parameters will fit the data.  And since the cost function is not globally convex, the parameters chosen pick a sigmoid that plateaus at the maximum value yet perceived.  You can see in the legend that A, k and C are all poorly approximated for a small number of timesteps fed in.  Thus, despite its chemial and biological relevancy, sigmoidal curve shape parameters did not perform well when model tuning.
 
 ### Scaling and Dimensionality Reduction
 
@@ -209,10 +208,10 @@ NOTE: the probabilities reported from each model were never scaled since they al
 
 ### Model tuning
 
-Model tuning was particularly challenging for this product and remains an area where improvement can likely still be made.  Considering the desing of the cascading series model, I effectively created a neural network with inner layers reporting their probability.  I show this diagrammatically in [Figure Seven](#fig07).
+Model tuning was particularly challenging for this project and remains an area where improvement can likely still be made.  Considering the design of the cascading series model, I effectively created a neural network with inner layers reporting their probability.  I show this diagrammatically in [Figure Seven](#fig07).
 
 #### <a name="fig07"></a> Figure Seven - pseudo Neural Net architecture
-*The architecture of the cascading series model.  Input layers: At each timestep, the color changes for all of the spots up to that timestep (DI{t<sub>0</sub>, t<sub>1</sub>,...,t<sub>j</sub>) are fed in to the model.  Hidden layers: A featurizer (F<sub>d,j</sub> for detection, F<sub>g,j</sub> for gram, F<sub>c,j</sub> for classification) extracts, scales and does dimensionality reduction on the relevant features and passes them to the models (g<sub>d,j</sub>, g<sub>g,j</sub>, g<sub>c,j</sub>.  The models pass the probabilities of detection, gram and classification to the output layers as well as to the next timestep's hidden layers.*
+*The architecture of the cascading series model.  Input layers: At each timestep, the color changes for all of the spots up to that timestep (DI{t<sub>0</sub>, t<sub>1</sub>,...,t<sub>j</sub>) are fed in to the model.  Hidden layers: A featurizer (F<sub>d,j</sub> for detection, F<sub>g,j</sub> for gram, F<sub>c,j</sub> for classification) extracts, scales and does dimensionality reduction on the relevant features and passes them to the models (g<sub>d,j</sub>, g<sub>g,j</sub>, g<sub>c,j</sub>).  The models pass the probabilities of detection, gram and classification to the output layers as well as to the next timestep's hidden layers.*
 
 ![Figure Seven - pseudo Neural Net architecture](img/neural1.png)
 
@@ -224,13 +223,13 @@ Here the blue circles represent the data being passed in at each timestep.  The 
 
 ![Figure Eight - pseudo Neural Net architecture aat timestep j](img/neural2.png)
 
-As described in [Figure Three](#fig03), the model is cascading: at each timestep, the detection classifier, g<sub>d,j</sub>, feeds the gram classifier, g<sub>g,j</sub>, which feed the classification classifier, g<sub>c,1</sub>.  The model is series as in [Figure Four](#fig04) since the classifiers at timestep j pass their results along to timestep j+1 (g<sub>d,j</sub> connects to F<sub>d,j+1</sub>).  This could be described as the hidden layers of a neural net.  The input layers are the passing in of data up to that timestep, and the output layers are the reported probabilities at each timestep.
+As described in [Figure Three](#fig03), the model is cascading: at each timestep, the detection classifier, g<sub>d,j</sub>, feeds the gram classifier, g<sub>g,j</sub>, which feeds the classification classifier, g<sub>c,1</sub>.  The model is series as in [Figure Four](#fig04) since the classifiers at timestep j pass their results along to timestep j+1 (g<sub>d,j</sub> connects to F<sub>d,j+1</sub>).  This could be described as the hidden layers of a neural net.  The input layers are the passing in of data up to that timestep, and the output layers are the reported probabilities at each timestep.
 
 Put all together, for the ~ 50 timesteps I considered, I created 3 featurizers, 3 scalers, 3 dimensionality reducers and 3 models.  These all interact with each other, as shown in the interactions at a given timestep in [Figure Eight](#fig08).  This means I have 150 interdependent models, featurizers, scalers and reducers all of which have tuning hyperparameters.  This is an enormous model space to explore and one I continue to explore now to find better performance.
 
-To handle searching this model space I made a few simplifications.  I created a job-runner file, capstone.py, that accepts a runid on the command line that corresponds to where the output results should be written and from what json the run parameters should be picked.  I placed a sample json in the data folder.  The json describes how the SeriesModel object (my class for handling the models illustrated in [Figure Seven](#fig07) and [Figure Eight](#fig08)) is constructed.
+To handle searching this model space I made a few simplifications.  I created a job-runner file, `capstone.py`, that accepts a runid on the command line that corresponds to where the output results should be written and from what json the run parameters should be picked.  I placed a sample json in the data folder.  The json describes how the `SeriesModel` object (my class for handling the models illustrated in [Figure Seven](#fig07) and [Figure Eight](#fig08)) is constructed.
 
-Furthermore, I required the type of featurizer, scaler, reducer and classifier/model for each timestemp to be consistent (and stated in the run parameters json).  These are, e.g., the detection-base-model and detection-base-model-arguments, detection-base-featurizer, detection-base-featurizer-arguments, etc. of the SeriesModel class.  A summary of the types of models, featurizers, scalers and reducers I experimented with is listed below:
+Furthermore, I required the type of featurizer, scaler, reducer and classifier/model for each timestemp to be consistent (and stated in the run parameters json).  These are, e.g., the detection-base-model and detection-base-model-arguments, detection-base-featurizer, detection-base-featurizer-arguments, etc. of the `SeriesModel` class.  A summary of the types of models, featurizers, scalers and reducers I experimented with is listed below:
 
 + Featurizer
 	+ polynomial: 3rd or 4th order
@@ -249,17 +248,17 @@ Furthermore, I required the type of featurizer, scaler, reducer and classifier/m
 	+ SVM Classifier: 0.1, 1, 10 penalty parameter
 	+ Random Forest Classifier: 10, 50, 100 trees
 
-I ran these jobs by spinning up EC2 instances.  The "slow" step is the featurization, so I typically did this up front and pickled the results to pass along to other models using the same detection, gram and classifier featurization methods.  Thus, the SeriesModel class contains a load_state parameter to describe where to "start" the model from.
+I ran these jobs by spinning up EC2 instances.  The "slow" step is the featurization, so I typically did this up front and pickled the results to pass along to other models using the same detection, gram and classifier featurization methods.  Thus, the `SeriesModel` class contains a `load_state` parameter to describe where to "start" the model from.
 
 Featurization is a place where paralellization could help improve speed, but I didn't have time to translate it to pyspark.  This is another area of work in progress.
 
 ### Crossvalidation
 
-I used sklearn's StratifiedShuffleSplit to generate 10 folds of 90% train, 10% test data where each classification label (17 bacterial species plus control) was evenly split over each of the folds.  All featuriers, scalers, reducers and models were trained on the training folds, and evaluated best on their predictions for the corresponding testing folds.  This generated a set of ~110*10 = 1,100 detection, ~1,110 gram and ~1,100 classification predictions for each timestep.
+I used sklearn's `StratifiedShuffleSplit` to generate 10 folds of 90% train, 10% test data where each classification label (17 bacterial species plus control) was evenly split over each of the folds.  All featuriers, scalers, reducers and models were trained on the training folds, and evaluated based on their predictions for the corresponding testing folds.  This generated a set of ~110*10 = 1,100 detection, ~1,110 gram and ~1,100 classification predictions for each timestep.
 
 ### Model Evaluation
 
-I built up a suite of multiclass metrics and reporting in mutliclassmetrics.py.  This began with construction detection, gram and classification confusion matrices *(at each timestep)*, and then computing the various performance metrics on a one-versus-all and micro and macro averaged premise: accuracy, recall, precision, f1.  To pick the best model, I observed how all of these metrics evolved as more timesteps were included.  Recall that a perfect model has excellent metrics at a very early time. 
+I built up a suite of multiclass metrics and reporting in `mutliclassmetrics.py`.  This began with constructing detection, gram and classification confusion matrices *(at each timestep)*, and then computing the various performance metrics on a one-versus-all and micro and macro averaged premise: accuracy, recall, precision, f1.  To pick the best model, I observed how all of these metrics evolved as more timesteps were included.  Recall that a perfect model has excellent metrics at a very early time. 
 
 
 ## <a name="trigger"></a> Designing a Triggered, Series Model
@@ -271,7 +270,7 @@ My initial results from the cascading series models were promising, but I felt t
 
 ![Figure Nine - Varying "Trigger" Times](img/responses.png)
 
-As you can see in [Figure Nine](#fig09), the curve shapes are all similar.  At any given time, however, there exists a large variance in the curves' shape and values.  Assuming the time at which the curves drastically change represents the time at which the bacteria in that particular observation entered their exponential growth phase, this time-shift in the curves represents the biological variability in the trials as well as the sampling variability in the precise amount of bacteria a given trial was innoculated with.  I wondered if I could collapse these curves on to some new time scale, t* = t - tau, where tau was the "growth" time, or time at which the big changes in these curves appeared.
+As you can see in [Figure Nine](#fig09), the curve shapes are all similar.  At any given time, however, there exists a large variance in the curves' shape and values.  Assuming the time at which the curves drastically change represents the time at which the bacteria in that particular observation entered their exponential growth phase, this time-shift in the curves represents the biological variability in the trials as well as the sampling variability in the precise amount of bacteria a given trial was inoculated with.  I wondered if I could collapse these curves onto some new time scale, `t* = t - tau`, where `tau` was the "growth" time, or time at which the big changes in these curves appeared.
 
 Looking at the full 20 hours of the curve, it is clear that the time at which the absolute maximum first or absolute maxium second derivaties occur whould be a good estimate of the taus, the "trigger" times, for each of these samples.  I show a couple examples of this in [Figure Ten](#fig10).
 
@@ -281,11 +280,11 @@ Looking at the full 20 hours of the curve, it is clear that the time at which th
 
 ![Figure Ten - Finding "Trigger" Times](img/trigger.png)
 
-Looking at the full time curve as shown in [Figure Ten](#fig10), simple backward differencing can correctly find the absolute maxium derivatives.  But, thinking forward to how you could detect if a trial had "triggered" in real time, I needed a differentiation scheme that would have low errors at the boundaries.  I imagined building a "trigger" model that, once a trial was confidently predicted to have entered this exponential groth phase, would send the data to the t* = 0 gram and classification models.  I needed to be able to collapse the curves by time-shifting and I needed to know how to do that time-shifting as each individual timestep was fed in.
+Looking at the full time curve as shown in [Figure Ten](#fig10), simple backward differencing can correctly find the absolute maxium derivatives.  But, thinking forward to how you could detect if a trial had "triggered" in real time, I needed a differentiation scheme that would have low errors at the boundaries.  I imagined building a "trigger" model that, once a trial was confidently predicted to have entered this exponential growth phase, would send the data to the `t* = 0` gram and classification models.  I needed to be able to collapse the curves by time-shifting and I needed to know how to do that time-shifting as each individual timestep was fed in.
 
-Simple forwards or backwards differencing is subject to large numerical errors at the boundaries, so I constructed a centralized, fourth-order pade differentiation scheme with third order boundaries.  This provides a highly accurate estimate of the derivative of a curve by the solution of a matrix algebra problem.  You have to solve a tridiagonal jxj matrix multiplication problem, where j is the number of timesteps, but numpy's linalg.lstsq can do so quickly.  To add in an extra layer of numerical robustness, I further smoothed this results with a gaussian kernel *(sigma=2 worked the best)* to accurately predict this time of max change.
+Simple forwards or backwards differencing is subject to large numerical errors at the boundaries, so I constructed a centralized, fourth-order pade differentiation scheme with third order boundaries.  This provides a highly accurate estimate of the derivative of a curve by the solution of a matrix algebra problem.  You have to solve a tridiagonal jxj matrix multiplication problem, where j is the number of timesteps, but numpy's linalg.lstsq can do so quickly.  To add in an extra layer of numerical robustness, I further smoothed these results with a gaussian kernel *(sigma=2 worked the best)* to accurately predict this time of max change.
 
-To determine if this trigger time had been reached, I trained a new set of models using the features of absolute max first and second derivatives from a handful of spots that consistently respond quickly for all types of bacteria.  This "Triggered, Series" model was asked to predict if a sample was innoculated, deteciton = 0 or 1, based ont the features calculated for the the timesteps up to that point.  Because the controls representeted ~ 10% of all samples in the available dataset, I used SMOTE oversampling on the training set when training the models to assure always predicitng detection=1 was not a viable model.  The ROC curves and other metrics showed significantly improved performance over the unshifted cascading, series model for detection.  They improved over time up to a high plateau at around 12 hours fed in.  Thus, I had found a time invariant feature that my models could use to predict when growth had occurred and, thus, the trigger time neccessary to shift the timescale before feeding in the data to the cascading series model.
+To determine if this trigger time had been reached, I trained a new set of models using the features of absolute max first and second derivatives from a handful of spots that consistently respond quickly for all types of bacteria.  This "Triggered, Series" model was asked to predict if a sample was inoculated, detection = 0 or 1, based on the features calculated for the the timesteps up to that point.  Because the controls representeted ~ 10% of all samples in the available dataset, I used SMOTE oversampling on the training set when training the models to assure always predicting detection=1 was not a viable model.  The ROC curves and other metrics showed significantly improved performance over the unshifted cascading, series model for detection.  They improved over time up to a high plateau at around 12 hours fed in.  Thus, I had found a time invariant feature that my models could use to predict when growth had occurred and, thus, the trigger time neccessary to shift the timescale before feeding in the data to the cascading series model.
 
 The best way to see this is from kernel density estimates of the observed number of timesteps versus the estimated time of absolute maximum derivative, shown in [Figure Eleven](#fig11) below.
 
@@ -295,26 +294,26 @@ The best way to see this is from kernel density estimates of the observed number
 
 ![Figure Eleven - KDE of Observed Time vs. Time of Absolute Max Derivative](img/kde.png)
 
-[Figure Eleven](#fig11) represents the pair-wise density of (number of timesteps observed, time at which absolute maximum first derivative occurred) for two species of bacteria.  You can see that the majority of observations, indicated by the moderate shading, at early times are dispersely spread under the line y = x.  This means that until the "trigger" time is reached, the maximum derivative may have occurred at any time.  Since the curves are relatively flat before the trigger time, this makes sense - random fluctuations could make any change the "max" change before the "trigger" time.  But, since this corresponds to small values of the max change since these fluctuations are small compared to large change that occurs at the trigger time, our model shouldn't predict detection at these early times.
+[Figure Eleven](#fig11) represents the pair-wise density of (number of timesteps observed, time at which absolute maximum first derivative occurred) for two species of bacteria.  You can see that the majority of observations, indicated by the moderate shading, at early times are dispersely spread under the line y = x.  This means that until the "trigger" time is reached, the maximum derivative may have occurred at any time.  Since the curves are relatively flat before the trigger time, this makes sense - random fluctuations could make any change the "max" change before the "trigger" time.  But, since this corresponds to small values of the max change since these fluctuations are small compared to the larger changes that occur at the trigger time, our model shouldn't predict detection at these early times.
 
 At later times, starting at around 14 hours for the curve on the left, 10 hours for the curve on the right, a dark horizontal band occurs at y=14 and y=10, respectively.  This means that once the "trigger" time has been reached, it is always returned as the time of absolute maximum first derivative.  Furthermore, if our model is tuned to predict detection = 1 based on the value of that absolute maximum derivative, we can sucessfully predict that a particular trial has "triggered" in real time, i.e. one timestep at a time.
 
-To pick such a model from my set of models generated at each timestep, I considered the kernel density estimates of detection = 0  (controls), vs. detection = 1 (innoculated samples), shown in [Figure Twelve](#fig12) below.
+To pick such a model from my set of models generated at each timestep, I considered the kernel density estimates of detection = 0  (controls), vs. detection = 1 (inoculated samples), shown in [Figure Twelve](#fig12) below.
 
-#### <a name="fig12"></a> Figure Twelve - KDE of Observed Time vs. Time of Absolute Max Derivative for controls and innoculated samples
+#### <a name="fig12"></a> Figure Twelve - KDE of Observed Time vs. Time of Absolute Max Derivative for controls and inoculated samples
 
 *Kernel density estimates of the observed time vs. time of absolute maximum derivative for a characteristic spot for controls (right in blue) and all species of bacteria (left in red).  The x-axis represents the number of timesteps observed while the y-axis represents the time at which the maximum absolute first derivative was observed for the timesteps up to that point.  The shading represents the frequency of observations.*
 
-![Figure Twelve - KDE of Observed Time vs. Time of Absolute Max Derivative for control vs. innoculated samples](img/kde2.png)
+![Figure Twelve - KDE of Observed Time vs. Time of Absolute Max Derivative for control vs. inoculated samples](img/kde2.png)
 
-As was seen when comparing classification metrics versus time (e.g. recall), at around 12 hours observed, we have a high density of observation of maximum derivative also at 12 hours for the innoculated case (left in red).  For the control (right in blue), shading remains relatively diffuse over the full timescale and certainly no more dense at 12 hours observed.  This suggests that the 12 hours observed model can effectively find the "trigger" time for all samples.  I am currently in the process of retraining my cascading series model based on my best performing "trigger" model at 12 hours:
+As was seen when comparing classification metrics versus time (e.g. recall), at around 12 hours observed, we have a high density of observation of maximum derivative also at 12 hours for the inoculated case (left in red).  For the control (right in blue), shading remains relatively diffuse over the full timescale and certainly no more dense at 12 hours observed.  This suggests that the 12 hours observed model can effectively find the "trigger" time for all samples.  I am currently in the process of retraining my cascading series model based on my best performing "trigger" model at 12 hours:
 
 + Model: Random forest with 100 trees
 + Features: Absolute maximum first and second derivatives from 5 spots showing early growth (10 total features)
 + Scaling: Standard Scaling
 + Dimensionality Reduction: PCA with 10 components
 
-The "trigger" model determines the time-scale shift and gram and classification models are built at the tau = 0, tau = 20 minutes, ..., etc. timesteps.
+The "trigger" model determines the time-scale shift, and gram and classification models are built at the tau = 0, tau = 20 minutes, ..., etc. timesteps.
 
 ## <a name="results"></a> Results
 
@@ -327,13 +326,13 @@ The best way to try-out the code yourself is to clone this repo:
 git clone https://github.com/andersberliner/smelling_sepsis.git
 ```
 
-Most of the packages I used are familiar and available in standard conda installations (numpy, scipy, pandas).  When working with Amazon EC2, however, I found that to utilize the multiprocessing capabilities of sklearns models, an upgrade is often required.  I recommend updating scikit-learn before trying to use the code for your use case.
+Most of the packages I used are familiar and available in standard conda installations (`numpy`, `scipy`, `pandas`).  When working with Amazon EC2, however, I found that to utilize the multiprocessing capabilities of sklearn's models, an upgrade is often required.  I recommend updating scikit-learn before trying to use the code for your use case.
 
 ```bash
 pip install -U scikit-learn
 ```
 
-Most other modules also available via pip, like seaborn for plotting extensions and pympler for memory diagnostics, should be easy to get.  For unbalanced datasets, I used the work of [F. Nogueira and G. Lemaitre](https://github.com/glemaitre/UnbalancedDataset).  You will need to clone the code from the repo and install.
+Most other modules are also available via pip, like `seaborn` for plotting extensions and `pympler` for memory diagnostics, should be easy to get.  For unbalanced datasets, I used the work of [F. Nogueira and G. Lemaitre](https://github.com/glemaitre/UnbalancedDataset).  You will need to clone the code from the repo and install.
 
 ```bash
 git clone https://github.com/fmfn/UnbalancedDataset.git
@@ -341,9 +340,9 @@ cd UnbalancedDataset
 python setup.py install
 ```
 
-Use cases are shown [here](https://github.com/fmfn/UnbalancedDataset/blob/master/notebook/Notebook_UnbalancedDataset.ipynb), or see how I use it for oversampling in my code in triggeredseriesmodel.py.
+Use cases are shown [here](https://github.com/fmfn/UnbalancedDataset/blob/master/notebook/Notebook_UnbalancedDataset.ipynb), or see how I use it for oversampling in my code in `triggeredseriesmodel.py`.
 
-If you want to try and use R functionalities in your python programs, know that rpy2 can be particularly challenging to get onto Amazon EC2 instances.  See their documentation for more help.
+If you want to try and use R functionalities in your python programs, know that `rpy2` can be particularly challenging to get onto Amazon EC2 instances.  See their documentation for more help.
 
 The code was designed to work with the Specific Technologies data pipeline *(see [data structures](#data) to learn how to use it "out-of-the-box")*, and has some pieces built specifically around their use-case *([seriesmodel.py](/seriesmodel.py) currently only supports three-class label cascades)*.  That aside, I do believe there are a variety of other use cases where you could use this algorithm effectively with little effort.  See the [code walkthrough](#code) and please [contact me](#contact) for more help.
 
@@ -361,23 +360,23 @@ The raw data for each trial is in a tsv text file, where each line of the file i
 - ...
 - FLOAT: spot 80 median B pixel intensity
 
-I loaded this data into a pandas series for that data, X, and a pandas dataframe for the labels, y, where each row of the dataframe was a trial.  
+I loaded this data into a pandas series for that data, `X`, and a pandas dataframe for the labels, `y`, where each row of the dataframe was a trial.  
 
-In X, the index of each row is the trial-id and the data is a number of times X (number of features + 1) numpy array.  When loading the data, I pruned the orientation spots to get from 240 to 219 total features.  The additional column of the numpy array was for the time, in minutes elapsed, since that start of the trial.
+In `X`, the index of each row is the trial-id and the data is a number of times X (number of features + 1) numpy array.  When loading the data, I pruned the orientation spots to get from 240 to 219 total features.  The additional column of the numpy array was for the time, in minutes elapsed, since that start of the trial.
 
-In y, the index of each row is again the trial-id, and the "detection", "gram" and "classification" labels were interpretted from the trial label (containing the species) and a dictionary loaded from a [csv file](species_to_gram2.csv) to assign detection, gram and classification labels from that trial label.
+In `y`, the index of each row is again the trial-id, and the "detection", "gram" and "classification" labels were interpretted from the trial label (containing the species) and a dictionary loaded from a [csv file](species_to_gram2.csv) to assign detection, gram and classification labels from that trial label.
 
-For featurization at each timestep, the X pandas series had the numpy array of each trial trimmed to number of timesteps X number of features + 1.  The featurizers take these pandas series and convert them into a single numpy array, where each row represents a trial and the curve shape parameters for each of the features flattened into a row vector are the values (number of trials X number of features*number of curve shape parameters + 1).
+For featurization at each timestep, the `X` pandas series had the numpy array of each trial trimmed to number of timesteps X number of features + 1.  The featurizers take these pandas series and convert them into a single numpy array, where each row represents a trial and the curve shape parameters for each of the features flattened into a row vector are the values (number of trials X number of features*number of curve shape parameters + 1).
 
 The scalers and reducers then worked with these numpy arrays, and the models worked with the reduced numpy arrays (number of trials X number of components included from PCA).
 
 The models returned predictions as a number of trials X 1 numpy array and probabilities as a number of trials X number of classes numpy array.
 
-Results were stored as an instance variable of the SeriesModel class as dictionaries of dataframes (for detection, gram and classification).  See [seriesmodel.py](seriesmodel.py) for more details.  The numpy arrays generated from featurization, scaling and reducing could either be stored as instance variables of the SeriesModel class or written to disk (for use by future runs) as dictionaries of numpy arrays.
+Results were stored as an instance variable of the SeriesModel class as dictionaries of dataframes (for detection, gram and classification).  See [seriesmodel.py](seriesmodel.py) for more details.  The numpy arrays generated from featurization, scaling and reducing could either be stored as instance variables of the `SeriesModel` class or written to disk (for use by future runs) as dictionaries of numpy arrays.
 
 ## <a name="code"></a>Code walkthrough
 
-[capstone.py](capstone.py) is the "job-runner", which fits and evaluates a triggered or cascading series model based on the parameters contained in json file declared as a command-line argument.  The json contains all of the initialization parameters for TriggeredSeriesModel or SeriesModel created in a capstone.py run.  For example, to evaluate a model given the parameters in run001.json, you would run the following command:
+[capstone.py](capstone.py) is the "job-runner", which fits and evaluates a triggered or cascading series model based on the parameters contained in the json file declared as a command-line argument.  The json contains all of the initialization parameters for `TriggeredSeriesModel` or `SeriesModel` created in a `capstone.py` run.  For example, to evaluate a model given the parameters in `run001.json`, you would run the following command:
 
 ```bash
 python capstone.py run001
@@ -385,7 +384,7 @@ python capstone.py run001
 
 Results are stored in the run001 folder.
 
-[seriesmodel.py](seriesmodel.py) contains the SeriesModel class.  Given an X and y dataframe that fits the structures described in [data](#data), it behaves similarly to an sklearn classifier:
+[seriesmodel.py](seriesmodel.py) contains the `SeriesModel` class.  Given an `X` and `y` dataframe that fits the structures described in [data](#data), it behaves similarly to an sklearn classifier:
 
 ```python
 from seriesmodel import SeriesModel
@@ -393,11 +392,11 @@ sm = SeriesModel(**run_params)
 sm.fit(X,y)
 ```
 
-Here run_params is a dictionary loaded from the run parameters json containing all of the initialization variables for a SeriesModel object.  A full description of all of the initialization variables is available in the docstring.
+Here `run_params` is a dictionary loaded from the run parameters json containing all of the initialization variables for a `SeriesModel` object.  A full description of all of the initialization variables is available in the docstring.
 
-The results and scores are in sm.results and sm.scores following the call of sm.fit(X,y).  I did this as opposed to creating the sm.predict and sm.score methods because my dataset did not have enough examples of every class to create a reasonably sized train, test and hold-set.  Instead, I generated cross-validation folds and trained the model at each timestep based on the 10 training folds, then scored based on the predictions for the 10 testing folds.  To save computational time, it was faster to train, predict, score at each timestep than to train at each timestep first, then re-iterate over each timestep to predict and score the test set.
+The results and scores are in `sm.results` and `sm.scores` following the call of `sm.fit(X,y`).  I did this as opposed to creating the `sm.predict` and `sm.score` methods because my dataset did not have enough examples of every class to create a reasonably sized train, test and hold-set.  Instead, I generated cross-validation folds and trained the model at each timestep based on the 10 training folds, then scored based on the predictions for the 10 testing folds.  To save computational time, it was faster to train, predict, score at each timestep than to train at each timestep first, then re-iterate over each timestep to predict and score the test set.
 
-[triggeredseriesmodel.py](triggeredseriesmodel.py) contains the TriggeredSeriesModel class.  It is a child of the SeriesModel class, but has different fit method and different default initialization paramters.  Since it is expected that the user will use a smaller subset of features for a triggered series model, the column_headers for the features before a subset are selected are required at initialization.  The fit call is the same as for SeriesModel:
+[triggeredseriesmodel.py](triggeredseriesmodel.py) contains the `TriggeredSeriesModel` class.  It is a child of the `SeriesModel` class, but has a different `fit` method and different default initialization parameters.  Since it is expected that the user will use a smaller subset of features for a triggered series model, the `column_headers` for the features before a subset are selected are required at initialization.  The fit call is the same as for `SeriesModel`:
 
 ```python
 from triggeredseriesmodel import TriggeredSeriesModel
@@ -405,7 +404,7 @@ tsm = TriggeredSeriesModel(column_headers, **run_params)
 tsm.fit(X,y)
 ```
 
-capstone.py passes in these column_headers, created as the raw data is being loaded.  Results are stored in the same manner as for SeriesModel objects.
+`capstone.py` passes in these column_headers, created as the raw data is being loaded.  Results are stored in the same manner as for `SeriesModel` objects.
 
 [featurizer.py](featurizer.py) contains the various featurization classes, including polynomial, sigmoidal and derivative.  You specify the type of featurizer and the featurizer initialization parameters in the run json.  Each featurizer has a fit and predict method to return the model coefficients, R2 values as well as fitted data.  For a polynomial featurization, for example, you would call as follows:
 
@@ -416,9 +415,9 @@ mycoefs, myscores = PF.fit_transform(X)
 X_fit = PF.predict(X, mycoefs)
 ```
 
-Here X is a pandas data series as described in [data](#data).  You included X in the call to the predict method so you don't have extract a new dataframe containing just the times you want to fit at.
+Here `X` is a pandas data series as described in [data](#data).  You include `X` in the call to the predict method so you don't have extract a new dataframe containing just the times you want to fit at.
 
-The DerivativeFeaturizer behaves slightly differently in that instead of returning scores, it returns the time of absolute maximum derivatives *(the "trigger" time)* as its second return value.
+The `DerivativeFeaturizer` behaves slightly differently in that instead of returning scores, it returns the time of absolute maximum derivatives *(the "trigger" time)* as its second return value.
 
 ```python
 from featurizer import DerivativeFeaturizer
@@ -429,22 +428,22 @@ Xpp, triggerpp = deriv2.fit_transform(X)
 deriv2 = DerivativeFeaturizer(order=2, dx=1, reference_time=2)
 ```
 
-[notetype.py](nonetype.py) contains the NoneTypeFeaturizer, NoneTypeScaler and NoneTypeReducer classes.  These classes simply .method(X), return X methods to keep the structure of the SeriesModel and TriggeredSeriesModels .fit methods the same even if you want to run a job without extract curve shape parametes, without scaling the data or without performing any dimesionality reduction. 
+[nonetype.py](nonetype.py) contains the `NoneTypeFeaturizer`, `NoneTypeScaler` and `NoneTypeReducer` classes.  These classes simply contin `.method(X) => return X` methods to keep the structure of the `SeriesModel` and `TriggeredSeriesModels` `.fit` methods the same even if you want to run a job without extracting curve shape parameters, without scaling the data or without performing any dimesionality reduction. 
 
-[multiclassmetrics.py](multiclassmetrics.py) contains all of the functions to compute classification metrics on a one versus the rest (ovr) basis.  Consult the docstrings for information on each function.  A summary of all the metrics can be created via the classification_report_ovr.
+[multiclassmetrics.py](multiclassmetrics.py) contains all of the functions to compute classification metrics on a one versus the rest (ovr) basis.  Consult the docstrings for information on each function.  A summary of all the metrics can be created via the `classification_report_ovr`.
 
 ```python
 from multiclassmetrics import classification_report_ovr
 print classification_report_ovr(yt, yp, label_names)
 ```
 
-Here yt are the true labels, yp the predicted labels, and label_names is a numpy array of the set of label names in the order you'd like to see them on the classification report.
+Here `yt` are the true labels, `yp` the predicted labels, and `label_names` is a numpy array of the set of label names in the order you'd like to see them on the classification report.
 
 [math_capstone.py](math_capstone.py) contains the numeric diffentiator based on the pade scheme, as well as the sigmoid function of [eqn02](#eqn02) where A, C and k can be specified.  See the docstrings for more information.
 
 [utils_seriesmodel.py](utils_seriesmodel.py) and [utils_capstone.py](utils_capstone.py) contain a variety of utilities for file i-o and data frame slicing.
 
-[timeseriesplotter.py](timeseriesplotter.py) contains the SpotTimePlot class, which creates a dynamic plot to view the raw data.  To view how well the fits of your featurizer fit the raw data, you would call for example:
+[timeseriesplotter.py](timeseriesplotter.py) contains the `SpotTimePlot` class, which creates a dynamic plot to view the raw data.  To view how well the fits of your featurizer fit the raw data, you would call for example:
 
 ```python
 from timeseriesplotter import SpotTimePlot
@@ -452,15 +451,15 @@ STP = SpotTimePlot(y, column_headers)
 STP.plot_fits(X, X_fit)
 ```
 
-column_headers are the names of the columns in the numpy arrays of the X pandas dataseries.  y is the y pandas dataframe containing the labels for each trial.  X is that dataseries and X_fit the result of our featurizer.
+`column_headers` are the names of the columns in the numpy arrays of the `X` pandas dataseries.  `y` is the y pandas dataframe containing the labels for each trial.  `X` is that dataseries and `X_fit` the result of our featurizer.
 
-Similarly, you can call plot_raws to dynamically view the raw data of all classes at once, or an average of all classes, for different spots via:
+Similarly, you can call `plot_raws` to dynamically view the raw data of all classes at once, or an average of all classes, for different spots via:
 
 ```python
 STP.plot_raws(X)
 ```
 
-[output_capstone.py](output_capstone.py) contains the print_to_file_and_terminal function, which allows for either the printing to a logfile or the terminal of a runs progress.
+[output_capstone.py](output_capstone.py) contains the `print_to_file_and_terminal` function, which allows for either the printing to a logfile or the terminal of a run's progress.
 
 [visualization_capstone.py](visualization_capstone.py) contains the plotting functions for results (i.e. roc plots, metrics vs. time, kde plots, etc.).  See the docstrings for more details.
 
